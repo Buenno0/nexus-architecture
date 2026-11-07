@@ -23,6 +23,7 @@ from nexus.queue.dispatcher import OutboxDispatcher
 from nexus.queue.processor import DefaultProcessor, ProcessingError
 from nexus.queue.sqlite import SqliteQueue
 from nexus.queue.worker import Worker
+from nexus.resolution.engine import ResolutionProcessor
 from nexus.shared.config import Settings, get_settings
 
 pytestmark = pytest.mark.integration
@@ -34,6 +35,10 @@ PESSOA: dict[str, Any] = {
     "document": "123.456.789-09",
     "phone": "(11) 98765-4321",
 }
+
+
+#: Versao do processador que o worker usa quando ha repositorio disponivel.
+RESOLUTION_VERSION = ResolutionProcessor(None).version  # type: ignore[arg-type]
 
 
 def key() -> dict[str, str]:
@@ -82,9 +87,11 @@ class TestCicloCompleto:
         relatorio = client.post("/v1/ops/process", json={"max_messages": 10}).json()
 
         assert relatorio["processed"] == 1
-        resultado = repository.find_processing_result(record_id)
+        resultado = repository.find_processing_result(record_id, RESOLUTION_VERSION)
         assert resultado is not None
-        assert resultado.summary["entity_resolution"] == "not_implemented"
+        # A Fase 5 substituiu o processador: o resumo agora descreve a resolucao.
+        assert resultado.summary["stage"] == "entity-resolution"
+        assert resultado.processor_version == RESOLUTION_VERSION
         assert resultado.correlation_id
 
     def test_lote_grande_percorre_o_pipeline(self, client: TestClient, queue: SqliteQueue) -> None:
@@ -151,9 +158,12 @@ class TestIdempotenciaNoConsumo:
         resposta = client.post("/v1/records/person", json=PESSOA, headers=key()).json()
         record_id = resposta["record_id"]
 
-        worker = Worker(repository, queue, DefaultProcessor(), settings)
+        # Processador explicito e simples: o foco do teste e a reentrega, nao a
+        # resolucao de identidade. O marcador e lido na versao desse processador.
+        processador = DefaultProcessor()
+        worker = Worker(repository, queue, processador, settings)
         assert worker.process_once().processed == 1
-        primeiro = repository.find_processing_result(record_id)
+        primeiro = repository.find_processing_result(record_id, processador.version)
 
         # O outbox republica apos crash — ADR-003 admite explicitamente.
         queue.publish(QueueMessage("evento-republicado", record_id, "corr-bis"))
@@ -162,7 +172,7 @@ class TestIdempotenciaNoConsumo:
         assert segundo_relatorio.skipped_duplicate == 1
         assert segundo_relatorio.processed == 0
 
-        atual = repository.find_processing_result(record_id)
+        atual = repository.find_processing_result(record_id, processador.version)
         assert atual is not None and primeiro is not None
         assert atual.processed_at == primeiro.processed_at
         assert atual.event_id == primeiro.event_id
@@ -194,6 +204,8 @@ class TestFalhasEDlq:
         client.post("/v1/records/person", json=PESSOA, headers=key())
 
         class SempreFalha:
+            version = "teste-v1"
+
             def process(self, record: Any) -> dict[str, Any]:
                 raise ProcessingError("falha deliberada")
 
@@ -218,6 +230,8 @@ class TestFalhasEDlq:
         ]
 
         class SempreFalha:
+            version = "teste-v1"
+
             def process(self, record: Any) -> dict[str, Any]:
                 raise ProcessingError("falha deliberada")
 
@@ -229,7 +243,7 @@ class TestFalhasEDlq:
 
         assert client.post("/v1/ops/redrive", json={"limit": 10}).json()["redriven"] == 1
         assert client.post("/v1/ops/process", json={"max_messages": 10}).json()["processed"] == 1
-        assert repository.find_processing_result(record_id) is not None
+        assert repository.find_processing_result(record_id, RESOLUTION_VERSION) is not None
 
 
 class TestEndpointsDeOps:

@@ -18,7 +18,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
 | Cloud Infrastructure | 3 | Nao iniciado |
 | Nexus Control Center | 4 | Nao iniciado |
-| Nexus Entity Resolution | 5 | Nao iniciado |
+| Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Parcial (logging estruturado) |
 | Performance Engineering | 7 | Nao iniciado |
 
@@ -74,6 +74,40 @@ make dispatch && make drain && make queue-stats
 make fail-test RATE=0.5
 ```
 
+## Entity Resolution (Fase 5)
+
+| Metodo | Rota | Descricao |
+|---|---|---|
+| GET | `/v1/resolution/entities/{id}` | Entidade, vinculos e evidencia de cada fusao |
+| GET | `/v1/resolution/reviews` | Pares em duvida aguardando decisao |
+| POST | `/v1/resolution/reviews/{pair_id}` | `confirm` funde, `reject` registra a recusa |
+| GET | `/v1/resolution/stats` | Contadores duraveis de resolucao |
+| POST | `/v1/ops/reprocess` | Reenfileira o acervo sob a versao corrente |
+
+Tres faixas de decisao: `MATCH` funde, `POSSIBLE_MATCH` vai para revisao humana e
+**nunca funde sozinho**, `NO_MATCH` nao faz nada.
+
+```bash
+make reprocess && make drain && make resolution
+```
+
+```bash
+make reviews
+```
+
+### Medir a qualidade da resolucao
+
+```bash
+.venv/bin/python tools/generator.py --count 500 --duplicate-rate 0.15 --variant-rate 0.25 --post --seed 2026 --manifest gabarito.json
+```
+
+```bash
+.venv/bin/python tools/evaluate_resolution.py --manifest gabarito.json
+```
+
+O gabarito liga cada registro a entidade verdadeira que o originou. Sem ele nao da para
+afirmar que a resolucao funciona — apenas que ela roda.
+
 ### Header `Idempotency-Key` e obrigatorio nos POST
 
 ```bash
@@ -119,6 +153,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - [docs/architecture/access-patterns.md](docs/architecture/access-patterns.md) — modelagem DynamoDB
 - [docs/testing/phase-1-report.md](docs/testing/phase-1-report.md) — testes da Fase 1
 - [docs/testing/phase-2-report.md](docs/testing/phase-2-report.md) — testes da Fase 2
+- [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) — testes e qualidade da Fase 5
 - [docs/performance/](docs/performance/) — medicoes
 - [docs/adr/](docs/adr/) — registros de decisao arquitetural
   - [ADR-001](docs/adr/ADR-001-dynamodb-local.md) — DynamoDB Local em vez de PostgreSQL
@@ -126,6 +161,8 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-003](docs/adr/ADR-003-transactional-outbox.md) — Transactional outbox com GSI esparso
   - [ADR-004](docs/adr/ADR-004-fila-local-sqlite.md) — Fila local sobre SQLite
   - [ADR-005](docs/adr/ADR-005-idempotencia-no-consumo.md) — Idempotencia no consumo
+  - [ADR-006](docs/adr/ADR-006-entity-resolution.md) — Blocking, pontuacao e clusterizacao
+  - [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador
 
 ## Limitacoes conhecidas
 
@@ -133,14 +170,18 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **A fila so pode ser acessada de dentro do container** — SQLite em WAL nao
   atravessa a fronteira host/VM no macOS. Ver [ADR-004](docs/adr/ADR-004-fila-local-sqlite.md).
 - **Os endpoints `/v1/ops/*` nao tem autenticacao.** Fase 3.
-- **Nao ha Entity Resolution.** O worker executa mecanica de pipeline e declara isso no
-  proprio resultado. Fase 5.
+- **As metricas de qualidade da resolucao valem para dados sinteticos.** Dados reais
+  trazem sujeira que o gerador nao imita.
+- **Pesos e limiares de correspondencia sao parametros calibrados**, nao verdades.
+- **Nao ha interface de revisao**, apenas endpoints. A tela e escopo da Fase 4.
+- **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
+  culpada, mas reverte-la e manual.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.
 - **Metricas sao do processo**: zeram no reinicio e nao agregam entre replicas.
 - Nenhum recurso de nuvem foi provisionado; nenhuma medicao local vale como previsao
   de desempenho ou custo na AWS.
 
-Lista completa em [docs/testing/phase-2-report.md](docs/testing/phase-2-report.md).
+Lista completa em [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md).
 
 Este projeto e experimental e **nao** deve ser tratado como sistema de producao.

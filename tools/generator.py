@@ -34,6 +34,7 @@ import sys
 import unicodedata
 import uuid
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -108,14 +109,56 @@ def make_organization(fake: Faker, source: str) -> dict[str, Any]:
     }
 
 
-def vary(record: dict[str, Any], fake: Faker) -> dict[str, Any]:
-    """Altera um campo nao identificador: mesma entidade, conteudo diferente.
+def _transpose(value: str) -> str:
+    """Troca duas letras adjacentes, imitando erro de digitacao."""
+    letters = [index for index, char in enumerate(value) if char.isalpha()]
+    if len(letters) < 2:
+        return value
+    position = random.choice(letters[:-1])
+    chars = list(value)
+    chars[position], chars[position + 1] = chars[position + 1], chars[position]
+    return "".join(chars)
 
-    O documento e preservado de proposito — e ele que mantem a chave natural estavel.
-    Sem isso o registro pareceria uma entidade nova e o cenario nao testaria nada.
+
+def _drop_middle_name(value: str) -> str:
+    parts = value.split()
+    return f"{parts[0]} {parts[-1]}" if len(parts) > 2 else value
+
+
+def vary(record: dict[str, Any], fake: Faker) -> dict[str, Any]:
+    """Produz outra observacao da MESMA entidade, com diferencas realistas.
+
+    Variar apenas o telefone tornaria a avaliacao inutil: documento, e-mail e nome
+    continuariam identicos e qualquer resolvedor acertaria. As variacoes abaixo imitam
+    o que acontece entre fontes de verdade — abreviacao, erro de digitacao, troca de
+    provedor, campo nao informado.
+
+    O gabarito continua sabendo que e a mesma entidade, entao uma variacao agressiva
+    demais aparece honestamente como falso negativo na medicao, em vez de ficar
+    escondida.
     """
     variant = dict(record)
-    variant["phone"] = fake.phone_number()
+    nome = "full_name" if "full_name" in variant else "legal_name"
+
+    escolha = random.choice(
+        ["phone", "name_short", "name_typo", "email_domain", "drop_phone", "drop_document"]
+    )
+    if escolha == "phone":
+        variant["phone"] = fake.phone_number()
+    elif escolha == "name_short":
+        variant[nome] = _drop_middle_name(str(variant.get(nome, "")))
+    elif escolha == "name_typo":
+        variant[nome] = _transpose(str(variant.get(nome, "")))
+    elif escolha == "email_domain":
+        local = str(variant.get("email", "")).partition("@")[0]
+        if local:
+            variant["email"] = f"{local}@outro-provedor.com"
+    elif escolha == "drop_phone":
+        variant.pop("phone", None)
+    elif escolha == "drop_document":
+        # O caso mais dificil: sem o identificador forte, o par so e encontrado se
+        # nome, e-mail ou telefone bastarem.
+        variant.pop("document", None)
     return variant
 
 
@@ -127,32 +170,46 @@ def build_batch(
     source: str,
     duplicate_rate: float,
     variant_rate: float,
-) -> list[dict[str, Any]]:
-    """Monta o lote aplicando as taxas de duplicidade e de variante."""
+) -> list[tuple[dict[str, Any], int]]:
+    """Monta o lote e devolve cada registro com a entidade verdadeira que o originou.
+
+    O indice da entidade e o **gabarito**: duplicatas e variantes herdam o indice do
+    original de onde sairam. Sem ele nao da para afirmar que a resolucao funciona —
+    so que ela roda.
+    """
     factory = make_person if record_type == "person" else make_organization
-    batch: list[dict[str, Any]] = []
-    originals: list[dict[str, Any]] = []
+    batch: list[tuple[dict[str, Any], int]] = []
+    originals: list[tuple[dict[str, Any], int]] = []
 
     for _ in range(count):
         roll = random.random()
         if originals and roll < duplicate_rate:
-            batch.append(dict(random.choice(originals)))
+            record, entity = random.choice(originals)
+            batch.append((dict(record), entity))
         elif originals and roll < duplicate_rate + variant_rate:
-            batch.append(vary(random.choice(originals), fake))
+            record, entity = random.choice(originals)
+            batch.append((vary(record, fake), entity))
         else:
             record = factory(fake, source)
-            originals.append(record)
-            batch.append(record)
+            entity = len(originals)
+            originals.append((record, entity))
+            batch.append((record, entity))
     return batch
 
 
 def post_batch(
-    client: httpx.Client, url: str, record_type: str, batch: list[dict[str, Any]], *, verbose: bool
+    client: httpx.Client,
+    url: str,
+    record_type: str,
+    batch: list[tuple[dict[str, Any], int]],
+    *,
+    verbose: bool,
+    manifest: dict[str, int] | None = None,
 ) -> Stats:
     stats = Stats()
     endpoint = f"{url}{ENDPOINTS[record_type]}"
 
-    for index, record in enumerate(batch, start=1):
+    for index, (record, true_entity) in enumerate(batch, start=1):
         try:
             response = client.post(
                 endpoint,
@@ -167,6 +224,13 @@ def post_batch(
             stats.failed += 1
             print(f"  [{index}] falha de rede: {exc}", file=sys.stderr)
             continue
+
+        if manifest is not None and response.status_code in (200, 202):
+            # Duplicatas devolvem o record_id da observacao original, entao o mapa
+            # permanece coerente: o mesmo registro nunca recebe duas entidades.
+            record_id = response.json().get("record_id")
+            if record_id:
+                manifest[record_id] = true_entity
 
         if response.status_code == 202:
             stats.accepted += 1
@@ -205,6 +269,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--seed", type=int, default=None, help="semente para reprodutibilidade")
     parser.add_argument("--post", action="store_true", help="envia os registros para a API")
+    parser.add_argument(
+        "--manifest",
+        default=None,
+        metavar="ARQUIVO",
+        help="grava o gabarito (record_id -> entidade verdadeira) para avaliar a resolucao",
+    )
     parser.add_argument("--dry-run", action="store_true", help="imprime os registros em JSON")
     parser.add_argument("--verbose", action="store_true")
     return parser.parse_args(argv)
@@ -245,15 +315,33 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if args.dry_run:
-        for record in batch:
+        for record, _ in batch:
             print(json.dumps(record, ensure_ascii=False))
         return 0
 
+    manifest: dict[str, int] | None = {} if args.manifest else None
+
     print(f"Enviando {len(batch)} registros sinteticos ({args.type}) para {args.url} ...")
     with httpx.Client() as client:
-        stats = post_batch(client, args.url, args.type, batch, verbose=args.verbose)
+        stats = post_batch(
+            client, args.url, args.type, batch, verbose=args.verbose, manifest=manifest
+        )
 
     print(stats.render())
+
+    if args.manifest and manifest is not None:
+        destino = Path(args.manifest)
+        destino.write_text(
+            json.dumps(
+                {"record_type": args.type, "truth": manifest},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        entidades = len(set(manifest.values()))
+        print(f"gabarito: {len(manifest)} registros, {entidades} entidades -> {destino}")
+
     return 0 if stats.failed == 0 else 1
 
 

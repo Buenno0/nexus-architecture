@@ -14,11 +14,16 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 
 from nexus.persistence.models import (
+    Entity,
+    EntityMember,
     IdempotencyRecord,
+    MergeEvent,
     OutboxEvent,
     Page,
     ProcessingResult,
     RecordType,
+    ReviewItem,
+    ReviewStatus,
     StoredRecord,
 )
 
@@ -119,8 +124,8 @@ class RecordRepository(ABC):
         """
 
     @abstractmethod
-    def find_processing_result(self, record_id: str) -> ProcessingResult | None:
-        """Consulta o marcador de processamento.
+    def find_processing_result(self, record_id: str, version: str) -> ProcessingResult | None:
+        """Consulta o marcador de processamento da versao informada.
 
         Serve para evitar trabalho desnecessario antes de processar. **Nao e a
         garantia** — entre a consulta e a escrita existe janela de corrida, fechada
@@ -152,3 +157,98 @@ class RecordRepository(ABC):
     @abstractmethod
     def count_pending_outbox(self) -> int:
         """Total de eventos pendentes em todos os shards. Metrica de backlog."""
+
+    # ------------------------------------------------------- entity resolution
+
+    @abstractmethod
+    def put_blocking_keys(self, record_id: str, record_type: RecordType, keys: list[str]) -> None:
+        """Indexa a observacao sob suas chaves de bloco.
+
+        Gravadas **depois** da comparacao, para que o registro corrente nao apareca
+        entre os proprios candidatos.
+        """
+
+    @abstractmethod
+    def find_block_candidates(
+        self, keys: list[str], *, limit: int, exclude: str | None = None
+    ) -> tuple[list[str], bool]:
+        """Devolve ``(record_ids, truncado)`` para as chaves informadas.
+
+        O teto existe porque uma chave muito comum transformaria a comparacao em O(n).
+        A flag de truncagem e devolvida em vez de truncar em silencio: cortar candidatos
+        sem avisar esconderia falso negativo.
+        """
+
+    @abstractmethod
+    def get_entity(self, entity_id: str) -> Entity | None:
+        """Obtem a entidade canonica."""
+
+    @abstractmethod
+    def find_entity_id_for_record(self, record_id: str) -> str | None:
+        """Descobre a que entidade uma observacao pertence."""
+
+    @abstractmethod
+    def list_entity_members(self, entity_id: str) -> list[EntityMember]:
+        """Lista os vinculos da entidade, com evidencia de cada um."""
+
+    @abstractmethod
+    def list_merge_events(self, entity_id: str) -> list[MergeEvent]:
+        """Historico de fusoes que formaram a entidade."""
+
+    @abstractmethod
+    def create_entity(self, entity: Entity, members: list[EntityMember]) -> None:
+        """Cria a entidade e seus vinculos iniciais, atomicamente.
+
+        :raises CommitConflictError: a entidade ja existe.
+        """
+
+    @abstractmethod
+    def add_member(self, entity: Entity, member: EntityMember) -> Entity:
+        """Adiciona um vinculo, com escrita condicional sobre a versao da entidade.
+
+        :raises CommitConflictError: a entidade mudou desde a leitura.
+        """
+
+    @abstractmethod
+    def merge_entities(
+        self, target: Entity, source: Entity, members: list[EntityMember], event: MergeEvent
+    ) -> Entity:
+        """Move os vinculos da origem para o destino e registra o evento, atomicamente.
+
+        :raises CommitConflictError: alguma das entidades mudou desde a leitura.
+        """
+
+    @abstractmethod
+    def flag_entity(self, entity_id: str, reason: str) -> None:
+        """Marca a entidade para revisao humana, sem alterar seus vinculos."""
+
+    @abstractmethod
+    def put_review(self, item: ReviewItem) -> bool:
+        """Registra um par para revisao. ``False`` se o par ja era conhecido.
+
+        Impede que cada reprocessamento ressuscite uma decisao ja tomada.
+        """
+
+    @abstractmethod
+    def get_review(self, pair_id: str) -> ReviewItem | None:
+        """Obtem um par de revisao."""
+
+    @abstractmethod
+    def list_pending_reviews(self, *, limit: int) -> list[ReviewItem]:
+        """Lista pares aguardando decisao, pelo indice esparso."""
+
+    @abstractmethod
+    def decide_review(self, pair_id: str, status: ReviewStatus, reason: str | None) -> ReviewItem:
+        """Registra a decisao e remove o par do indice de pendentes."""
+
+    @abstractmethod
+    def increment_resolution_stats(self, **counters: int) -> None:
+        """Soma contadores duraveis de resolucao.
+
+        Contadores em memoria zeram no reinicio; estes sobrevivem e sao consistentes
+        entre processos.
+        """
+
+    @abstractmethod
+    def get_resolution_stats(self) -> dict[str, int]:
+        """Le os contadores duraveis de resolucao."""

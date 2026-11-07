@@ -57,6 +57,24 @@ Mitigacoes atuais:
 **Antes de qualquer exposicao publica na Fase 3, estas rotas exigem autenticacao.**
 Expostas sem protecao, permitiriam a terceiros consumir recurso a vontade.
 
+## Resolucao de identidade
+
+Fundir registros de pessoas distintas e, neste projeto, o erro de maior consequencia:
+dados se misturam de forma dificil de detectar e de reverter.
+
+Protecoes implementadas:
+
+- **Tres faixas de decisao.** Duvida vai para revisao humana, nunca para fusao.
+- **Guarda de campos minimos.** Um unico campo em comum nao funde, salvo identificador
+  forte exato.
+- **Teto de tamanho de cluster.** Fusao em cadeia e recusada e sinalizada.
+- **Evidencia por vinculo.** Cada fusao guarda o par e o score campo a campo.
+- **Medicao com gabarito.** Precisao e recall sao reportados separadamente, antes de
+  qualquer ajuste de peso.
+
+Limitacao: **nao ha operacao de desfazer fusao**. A evidencia permite localizar a aresta
+culpada, mas reverte-la e manual.
+
 ## Operacoes destrutivas
 
 - Nenhuma rota de exclusao em massa na Fase 1.

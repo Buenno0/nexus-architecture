@@ -97,6 +97,8 @@ class RecordDetail(BaseModel):
     correlation_id: str
     created_at: str
     seen_count: int
+    #: Entidade a que a observacao pertence, quando a resolucao ja a vinculou.
+    entity_id: str | None = None
 
 
 class RecordPage(BaseModel):
@@ -182,3 +184,96 @@ class RedriveRequest(BaseModel):
 
 class RedriveOut(BaseModel):
     redriven: int
+
+
+# -------------------------------------------------------------------- resolution
+
+
+class EntityMemberOut(BaseModel):
+    """Vinculo de uma observacao a uma entidade, com a evidencia que o justifica."""
+
+    record_id: str
+    joined_at: str
+    score: float
+    matched_record_id: str | None = None
+    evidence: dict[str, object] = Field(default_factory=dict)
+
+
+class MergeEventOut(BaseModel):
+    """Fusao que ajudou a formar a entidade."""
+
+    event_id: str
+    source_entity_id: str
+    record_a: str
+    record_b: str
+    score: float
+    moved_members: int
+    created_at: str
+
+
+class EntityOut(BaseModel):
+    """Entidade canonica com seus vinculos e historico de fusoes."""
+
+    entity_id: str
+    record_type: Literal["person", "organization"]
+    member_count: int
+    version: int
+    created_at: str
+    updated_at: str
+    flagged: bool
+    flag_reason: str | None = None
+    members: list[EntityMemberOut] = Field(default_factory=list)
+    merges: list[MergeEventOut] = Field(default_factory=list)
+
+
+class ReviewOut(BaseModel):
+    """Par aguardando decisao humana."""
+
+    pair_id: str
+    record_a: str
+    record_b: str
+    record_type: Literal["person", "organization"]
+    score: float
+    status: Literal["pending", "confirmed", "rejected"]
+    created_at: str
+    decided_at: str | None = None
+    reason: str | None = None
+    evidence: dict[str, object] = Field(default_factory=dict)
+
+
+class ReviewPage(BaseModel):
+    items: list[ReviewOut]
+
+
+class ReviewDecisionRequest(BaseModel):
+    """Decisao sobre um par em duvida.
+
+    ``confirm`` funde os clusters; ``reject`` registra a recusa e impede que o mesmo
+    par volte a fila em reprocessamentos futuros.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["confirm", "reject"]
+    reason: Annotated[str | None, Field(default=None, max_length=512)] = None
+
+
+class ResolutionStatsOut(BaseModel):
+    """Contadores duraveis de resolucao, lidos do armazenamento."""
+
+    processor_version: str
+    pending_reviews: int
+    counters: dict[str, int] = Field(default_factory=dict)
+
+
+class ReprocessRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    limit: int = Field(default=1_000, ge=1, le=10_000)
+
+
+class ReprocessOut(BaseModel):
+    version: str
+    scanned: int
+    enqueued: int
+    already_processed: int

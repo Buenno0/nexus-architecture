@@ -4,7 +4,11 @@ Documento de planejamento das Fases 3 a 8. Complementa o [ROADMAP.md](ROADMAP.md
 lista os itens; aqui estao o contexto, as decisoes ja tomadas que delimitam cada fase,
 as decisoes ainda em aberto e os criterios de aceite.
 
-Ultima atualizacao: 2026-11-06, ao concluir a Fase 2.
+Ultima atualizacao: 2026-11-06, ao concluir a Fase 5.
+
+> A Fase 5 foi concluida fora da ordem numerica, por nao depender da nuvem. Seu
+> planejamento permanece abaixo como registro; o resultado esta em
+> [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md).
 
 ---
 
@@ -16,7 +20,7 @@ Ultima atualizacao: 2026-11-06, ao concluir a Fase 2.
 | 2 | Nexus Queue Engine | **Concluida** |
 | 3 | Cloud Infrastructure | Nao iniciada |
 | 4 | Nexus Control Center | Nao iniciada |
-| 5 | Nexus Entity Resolution | Nao iniciada |
+| 5 | Nexus Entity Resolution | **Concluida** |
 | 6 | Nexus Observability | Parcial |
 | 7 | Performance Engineering | Nao iniciada |
 | 8 | Finalizacao | Nao iniciada |

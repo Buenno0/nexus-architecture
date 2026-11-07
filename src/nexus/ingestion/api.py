@@ -19,8 +19,11 @@ from nexus import __version__
 from nexus.ingestion.schemas import (
     DispatchOut,
     DispatchRequest,
+    EntityMemberOut,
+    EntityOut,
     ErrorOut,
     HealthOut,
+    MergeEventOut,
     OrganizationIn,
     PersonIn,
     ProcessOut,
@@ -31,17 +34,34 @@ from nexus.ingestion.schemas import (
     RecordPage,
     RedriveOut,
     RedriveRequest,
+    ReprocessOut,
+    ReprocessRequest,
+    ResolutionStatsOut,
+    ReviewDecisionRequest,
+    ReviewOut,
+    ReviewPage,
 )
 from nexus.ingestion.service import IngestionResult, IngestionService
 from nexus.observability.metrics import registry
 from nexus.observability.middleware import ObservabilityMiddleware
 from nexus.persistence import get_repository
-from nexus.persistence.models import RecordType, StoredRecord
+from nexus.persistence.models import (
+    Entity,
+    EntityMember,
+    MergeEvent,
+    RecordType,
+    ReviewItem,
+    ReviewStatus,
+    StoredRecord,
+)
 from nexus.persistence.repository import RecordRepository
 from nexus.queue import get_queue_client
 from nexus.queue.client import QueueClient
 from nexus.queue.dispatcher import OutboxDispatcher
+from nexus.queue.processor import build_processor
+from nexus.queue.reprocess import Reprocessor
 from nexus.queue.worker import Worker
+from nexus.resolution.clustering import ClusterManager
 from nexus.shared.config import Settings, get_settings
 from nexus.shared.errors import MissingIdempotencyKeyError, NexusError, RecordNotFoundError
 from nexus.shared.logging import configure_logging, get_correlation_id, get_logger
@@ -186,7 +206,7 @@ async def handle_unexpected(request: Request, exc: Exception) -> JSONResponse:
 # ------------------------------------------------------------------------- utilitarios
 
 
-def _to_detail(record: StoredRecord) -> RecordDetail:
+def _to_detail(record: StoredRecord, entity_id: str | None = None) -> RecordDetail:
     return RecordDetail(
         record_id=record.record_id,
         record_type=record.record_type.value,
@@ -197,6 +217,7 @@ def _to_detail(record: StoredRecord) -> RecordDetail:
         correlation_id=record.correlation_id,
         created_at=record.created_at.isoformat(),
         seen_count=record.seen_count,
+        entity_id=entity_id,
     )
 
 
@@ -291,7 +312,10 @@ async def get_record(
     record = await run_in_threadpool(repository.get_record, record_id)
     if record is None:
         raise RecordNotFoundError("Registro nao encontrado", details={"record_id": record_id})
-    return _to_detail(record)
+    # Observacao e vinculo compartilham particao: descobrir a entidade custa uma
+    # consulta barata na mesma chave. Ver docs/architecture/access-patterns.md.
+    entity_id = await run_in_threadpool(repository.find_entity_id_for_record, record_id)
+    return _to_detail(record, entity_id)
 
 
 @app.get(
@@ -465,3 +489,186 @@ async def ops_redrive(queue: QueueDep, body: RedriveRequest | None = None) -> Re
     request_body = body or RedriveRequest()
     count = await run_in_threadpool(queue.redrive, limit=request_body.limit)
     return RedriveOut(redriven=count)
+
+
+# ---------------------------------------------------------------------- resolution
+#
+# Entity Resolution expoe o que decidiu e **por que**. A evidencia campo a campo nao e
+# detalhe de depuracao: e o que permite auditar uma fusao e ajustar pesos com dado em
+# vez de palpite.
+
+
+def _member_out(member: EntityMember) -> EntityMemberOut:
+    return EntityMemberOut(
+        record_id=member.record_id,
+        joined_at=member.joined_at.isoformat(),
+        score=member.score,
+        matched_record_id=member.matched_record_id,
+        evidence=dict(member.evidence),
+    )
+
+
+def _merge_out(event: MergeEvent) -> MergeEventOut:
+    return MergeEventOut(
+        event_id=event.event_id,
+        source_entity_id=event.source_entity_id,
+        record_a=event.record_a,
+        record_b=event.record_b,
+        score=event.score,
+        moved_members=event.moved_members,
+        created_at=event.created_at.isoformat(),
+    )
+
+
+def _entity_out(entity: Entity, members: list[EntityMember], merges: list[MergeEvent]) -> EntityOut:
+    return EntityOut(
+        entity_id=entity.entity_id,
+        record_type=entity.record_type.value,
+        member_count=entity.member_count,
+        version=entity.version,
+        created_at=entity.created_at.isoformat(),
+        updated_at=entity.updated_at.isoformat(),
+        flagged=entity.flagged,
+        flag_reason=entity.flag_reason,
+        members=[_member_out(member) for member in members],
+        merges=[_merge_out(event) for event in merges],
+    )
+
+
+def _review_out(item: ReviewItem) -> ReviewOut:
+    return ReviewOut(
+        pair_id=item.pair_id,
+        record_a=item.record_a,
+        record_b=item.record_b,
+        record_type=item.record_type.value,
+        score=item.score,
+        status=item.status.value,
+        created_at=item.created_at.isoformat(),
+        decided_at=item.decided_at.isoformat() if item.decided_at else None,
+        reason=item.reason,
+        evidence=dict(item.evidence),
+    )
+
+
+@app.get(
+    "/v1/resolution/entities/{entity_id}",
+    response_model=EntityOut,
+    summary="Entidade canonica com vinculos e historico de fusoes",
+    responses={404: {"model": ErrorOut, "description": "Entidade inexistente"}},
+    tags=["resolution"],
+)
+async def get_entity(
+    entity_id: Annotated[str, Path(min_length=1, max_length=64)],
+    repository: RepositoryDep = None,  # type: ignore[assignment]
+) -> EntityOut:
+    entity = await run_in_threadpool(repository.get_entity, entity_id)
+    if entity is None:
+        raise RecordNotFoundError("Entidade nao encontrada", details={"entity_id": entity_id})
+    members = await run_in_threadpool(repository.list_entity_members, entity_id)
+    merges = await run_in_threadpool(repository.list_merge_events, entity_id)
+    return _entity_out(entity, members, merges)
+
+
+@app.get(
+    "/v1/resolution/reviews",
+    response_model=ReviewPage,
+    summary="Pares aguardando decisao humana",
+    tags=["resolution"],
+)
+async def list_reviews(
+    repository: RepositoryDep,
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+) -> ReviewPage:
+    items = await run_in_threadpool(repository.list_pending_reviews, limit=limit)
+    return ReviewPage(items=[_review_out(item) for item in items])
+
+
+@app.post(
+    "/v1/resolution/reviews/{pair_id}",
+    response_model=ReviewOut,
+    summary="Decide um par em duvida",
+    responses={404: {"model": ErrorOut, "description": "Par inexistente"}},
+    tags=["resolution"],
+)
+async def decide_review(
+    pair_id: Annotated[str, Path(min_length=1, max_length=64)],
+    body: ReviewDecisionRequest,
+    repository: RepositoryDep,
+    settings: SettingsDep,
+) -> ReviewOut:
+    """Confirma ou recusa uma correspondencia provavel.
+
+    Confirmar funde os clusters, exatamente como uma correspondencia certa faria.
+    Recusar registra a decisao — e, por ja existir o par, impede que reprocessamentos
+    futuros o recriem.
+    """
+    item = await run_in_threadpool(repository.get_review, pair_id)
+    if item is None:
+        raise RecordNotFoundError("Par de revisao nao encontrado", details={"pair_id": pair_id})
+
+    if body.decision == "confirm":
+        manager = ClusterManager(repository, settings)
+        await run_in_threadpool(
+            manager.link,
+            item.record_a,
+            item.record_b,
+            item.record_type,
+            item.score,
+            dict(item.evidence),
+        )
+        status = ReviewStatus.CONFIRMED
+    else:
+        status = ReviewStatus.REJECTED
+
+    decided = await run_in_threadpool(repository.decide_review, pair_id, status, body.reason)
+    logger.info(
+        "review_decided",
+        extra={"pair_id": pair_id, "decision": body.decision},
+    )
+    return _review_out(decided)
+
+
+@app.get(
+    "/v1/resolution/stats",
+    response_model=ResolutionStatsOut,
+    summary="Contadores de resolucao",
+    tags=["resolution"],
+)
+async def resolution_stats(repository: RepositoryDep, settings: SettingsDep) -> ResolutionStatsOut:
+    counters = await run_in_threadpool(repository.get_resolution_stats)
+    pending = await run_in_threadpool(repository.list_pending_reviews, limit=100)
+    processor = build_processor(settings, repository)
+    return ResolutionStatsOut(
+        processor_version=processor.version,
+        pending_reviews=len(pending),
+        counters=counters,
+    )
+
+
+@app.post(
+    "/v1/ops/reprocess",
+    response_model=ReprocessOut,
+    summary="Reenfileira observacoes sem resultado na versao corrente",
+    tags=["ops"],
+)
+async def ops_reprocess(
+    repository: RepositoryDep,
+    queue: QueueDep,
+    settings: SettingsDep,
+    body: ReprocessRequest | None = None,
+) -> ReprocessOut:
+    """Traz o acervo existente para a versao atual do processador — ADR-007.
+
+    Registros ja consumidos nao tem mais mensagem na fila. Rodar duas vezes nao duplica
+    trabalho: apenas o que falta na versao corrente e reenfileirado.
+    """
+    request_body = body or ReprocessRequest()
+    processor = build_processor(settings, repository)
+    reprocessor = Reprocessor(repository, queue, processor.version, settings)
+    report = await run_in_threadpool(reprocessor.run, limit=request_body.limit)
+    return ReprocessOut(
+        version=processor.version,
+        scanned=report.scanned,
+        enqueued=report.enqueued,
+        already_processed=report.already_processed,
+    )

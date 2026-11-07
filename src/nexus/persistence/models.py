@@ -22,6 +22,12 @@ class ProcessingStatus(StrEnum):
     SUCCEEDED = "succeeded"
 
 
+class ReviewStatus(StrEnum):
+    PENDING = "pending"
+    CONFIRMED = "confirmed"
+    REJECTED = "rejected"
+
+
 class OutboxStatus(StrEnum):
     PENDING = "pending"
     DISPATCHED = "dispatched"
@@ -114,4 +120,87 @@ class ProcessingResult:
     summary: dict[str, Any]
     correlation_id: str
     processed_at: datetime
+    processor_version: str = "pipeline-v1"
     status: ProcessingStatus = ProcessingStatus.SUCCEEDED
+
+
+# --------------------------------------------------------------- Entity Resolution
+
+
+@dataclass(frozen=True, slots=True)
+class Entity:
+    """Entidade canonica: um conjunto de observacoes julgadas a mesma do mundo real.
+
+    ``version`` suporta concorrencia otimista. Dois workers podem resolver registros
+    diferentes que apontam para a mesma entidade ao mesmo tempo; a escrita condicional
+    sobre a versao garante que uma perca e tente de novo, em vez de as duas gravarem
+    por cima uma da outra.
+
+    ``flagged`` marca entidades que precisam de olho humano — tipicamente por terem
+    atingido o teto de tamanho, sinal de fusao em cadeia.
+    """
+
+    entity_id: str
+    record_type: RecordType
+    member_count: int
+    version: int
+    created_at: datetime
+    updated_at: datetime
+    flagged: bool = False
+    flag_reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EntityMember:
+    """Vinculo entre uma observacao e uma entidade.
+
+    ``matched_record_id`` e ``evidence`` guardam **por que** o vinculo existe: qual par
+    o causou e o score campo a campo. Sem isso, desfazer uma fusao especifica seria
+    adivinhacao.
+    """
+
+    entity_id: str
+    record_id: str
+    joined_at: datetime
+    score: float
+    matched_record_id: str | None = None
+    evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class MergeEvent:
+    """Registro de uma fusao de entidades.
+
+    Guarda a entidade de origem e o par que a provocou, tornando o fecho transitivo
+    auditavel: e possivel reconstruir a cadeia que levou dois registros ao mesmo cluster.
+    """
+
+    entity_id: str
+    event_id: str
+    source_entity_id: str
+    record_a: str
+    record_b: str
+    score: float
+    moved_members: int
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewItem:
+    """Par em duvida, aguardando decisao.
+
+    ``POSSIBLE_MATCH`` nunca funde sozinho — vem para ca. ``review_shard`` existe
+    somente enquanto pendente, mantendo o indice proporcional a fila, nao a tabela.
+    """
+
+    pair_id: str
+    record_a: str
+    record_b: str
+    record_type: RecordType
+    score: float
+    evidence: dict[str, Any]
+    created_at: datetime
+    status: ReviewStatus = ReviewStatus.PENDING
+    review_shard: str | None = None
+    decided_at: datetime | None = None
+    reason: str | None = None

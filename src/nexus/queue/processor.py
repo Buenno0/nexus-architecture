@@ -25,6 +25,16 @@ class ProcessingError(Exception):
 class RecordProcessor(Protocol):
     """Unidade de trabalho aplicada a uma observacao."""
 
+    @property
+    def version(self) -> str:
+        """Identifica o processador que produziu o resultado — ADR-007.
+
+        Entra na chave do marcador de processamento. Trocar o processador muda a
+        versao, a chave nova nao colide com a antiga e o acervo reprocessa sozinho,
+        preservando o resultado anterior para comparacao.
+        """
+        ...
+
     def process(self, record: StoredRecord) -> dict[str, Any]:
         """Processa a observacao e devolve um resumo serializavel.
 
@@ -46,6 +56,10 @@ class DefaultProcessor:
     """
 
     stage = "pipeline-only"
+
+    @property
+    def version(self) -> str:
+        return "pipeline-v1"
 
     def process(self, record: StoredRecord) -> dict[str, Any]:
         normalized = record.normalized
@@ -85,6 +99,15 @@ class FailureInjectingProcessor:
         self._rng = rng or random.Random()
 
     @property
+    def version(self) -> str:
+        """Delega ao processador envolvido.
+
+        A injecao de falhas nao muda o que e produzido quando nao falha, entao nao
+        deve criar uma versao propria — isso reprocessaria o acervo sem motivo.
+        """
+        return self._wrapped.version
+
+    @property
     def rate(self) -> float:
         return self._rate
 
@@ -95,10 +118,23 @@ class FailureInjectingProcessor:
         return self._wrapped.process(record)
 
 
-def build_processor(settings: Settings | None = None) -> RecordProcessor:
-    """Monta o processador configurado para o ambiente."""
+def build_processor(
+    settings: Settings | None = None,
+    repository: Any = None,
+) -> RecordProcessor:
+    """Monta o processador configurado para o ambiente.
+
+    Com repositorio disponivel, usa o resolvedor de identidade da Fase 5; sem ele,
+    recai no processador de mecanica de pipeline.
+    """
     settings = settings or get_settings()
-    base = DefaultProcessor()
+    base: RecordProcessor
+    if repository is not None:
+        from nexus.resolution.engine import ResolutionProcessor
+
+        base = ResolutionProcessor(repository, settings)
+    else:
+        base = DefaultProcessor()
     if settings.failure_injection_rate > 0:
         logger.warning(
             "failure_injection_enabled",

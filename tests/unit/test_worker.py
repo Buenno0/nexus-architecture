@@ -72,11 +72,15 @@ def enqueue(repo: FakeRepository, queue: SqliteQueue, count: int = 1) -> list[st
 
 
 class SempreFalha:
+    version = "teste-v1"
+
     def process(self, record: StoredRecord) -> dict[str, Any]:
         raise ProcessingError("falha deliberada")
 
 
 class FalhaUmaVez:
+    version = "teste-v1"
+
     def __init__(self) -> None:
         self.chamadas = 0
 
@@ -96,7 +100,7 @@ class TestCaminhoFeliz:
 
         assert relatorio.received == 1
         assert relatorio.processed == 1
-        assert "rec-0" in repo.processing
+        assert "rec-0" in repo.processed_ids
 
     def test_remove_a_mensagem_da_fila(
         self, repo: FakeRepository, queue: SqliteQueue, settings: Settings
@@ -130,7 +134,7 @@ class TestCaminhoFeliz:
         enqueue(repo, queue, 1)
         Worker(repo, queue, DefaultProcessor(), settings).process_once()
 
-        resultado = repo.processing["rec-0"]
+        resultado = repo.result_for("rec-0")
         assert resultado.worker_id == "worker-teste"
         assert resultado.event_id == "evt-0"
         assert resultado.correlation_id == "corr-0"
@@ -204,7 +208,7 @@ class TestIdempotenciaNoConsumo:
         assert relatorio.skipped_duplicate == 1
         assert relatorio.processed == 0
         assert queue.stats().total == 0, "a mensagem deve sair da fila mesmo assim"
-        assert repo.processing["rec-0"].worker_id == "outro-worker"
+        assert repo.result_for("rec-0").worker_id == "outro-worker"
 
     def test_rodar_duas_vezes_nao_duplica(
         self, repo: FakeRepository, queue: SqliteQueue, settings: Settings
@@ -237,7 +241,7 @@ class TestFalhas:
         assert worker.process_once().retried == 1
         time.sleep(0.05)
         assert worker.process_once().processed == 1
-        assert "rec-0" in repo.processing
+        assert "rec-0" in repo.processed_ids
 
     def test_vai_para_dlq_ao_esgotar(
         self, repo: FakeRepository, queue: SqliteQueue, settings: Settings
@@ -288,7 +292,7 @@ class TestFalhas:
 
         assert queue.redrive(limit=10) == 1
         assert Worker(repo, queue, DefaultProcessor(), settings).process_once().processed == 1
-        assert "rec-0" in repo.processing
+        assert "rec-0" in repo.processed_ids
 
 
 class TestObservabilidade:

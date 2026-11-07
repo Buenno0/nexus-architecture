@@ -210,6 +210,40 @@ O worker consulta o marcador antes de processar, mas isso e otimizacao. A garant
 condicao na escrita: `CommitConflictError` significa que outro worker venceu, o trabalho
 foi feito, e a mensagem sai da fila.
 
+---
+
+## Resolucao de identidade (ADR-006)
+
+O resolvedor substituiu o processador da Fase 2 **sem que worker, fila ou persistencia
+mudassem** — o contrato `RecordProcessor` existia exatamente para isso.
+
+```
+observacao
+   |
+   v  chaves de bloco (documento, e-mail, nome, telefone)
+candidatos  --- teto com sinalizacao de truncagem
+   |
+   v  score ponderado, campo a campo, com piso de similaridade
+decisao
+   |
+   +-- MATCH           -> funde clusters, registra o par e a evidencia
+   +-- POSSIBLE_MATCH  -> fila de revisao, NUNCA funde sozinho
+   +-- NO_MATCH        -> nada
+```
+
+### Duas normalizacoes com objetivos opostos
+
+A ingestao preserva acentos e caixa porque sao **sinal** para o resolvedor. O blocking
+os remove porque, comparando, viram **ruido**. Agrupar demais custa comparacoes que o
+score descarta; perder um par e definitivo.
+
+### O marcador tambem impedia melhoria
+
+A chave do marcador passou a incluir a versao do processador
+([ADR-007](docs/adr/ADR-007-versionamento-do-processador.md)). Sem isso, trocar o
+processador nao reprocessaria nada: o marcador antigo existe e a escrita condicional
+recusaria — o acervo ficaria fora da resolucao em silencio.
+
 ### Acionamento
 
 ```
@@ -217,6 +251,8 @@ POST /v1/ops/dispatch   publica eventos pendentes do outbox
 POST /v1/ops/process    consome um lote
 GET  /v1/ops/queue      profundidade: pendentes, em voo, DLQ, outbox
 POST /v1/ops/redrive    devolve mensagens da DLQ
+POST /v1/ops/reprocess  reenfileira o acervo sob a versao corrente
+GET  /v1/resolution/*   entidades, revisoes e contadores
 ```
 
 Nada processa sozinho. Nenhum worker residente, nenhum polling continuo — todo o modelo
@@ -230,7 +266,7 @@ de custo depende disso.
 |---|---|---|
 | Ingestion | HTTP, validacao, normalizacao, idempotencia, transacao, publicacao | Nao compara entidades, nao decide duplicidade |
 | Queue Engine | Consumo, lotes, retry, backoff, DLQ, dispatcher de outbox | Nao conhece regra de negocio — o processador e injetado |
-| Entity Resolution | Candidatos, comparacao, score, decisao | Nao acessa fila nem HTTP (funcoes puras) |
+| Entity Resolution | Blocking, comparacao, score, decisao, clusters | Nao acessa fila nem HTTP; e invocado como processador |
 | Observability | correlation_id, logs JSON, metricas | Nao e processo separado — e camada transversal |
 | Control Center | Visualizacao e operacao | Nenhuma logica de negocio |
 
@@ -280,3 +316,5 @@ Ver [ADR-001](docs/adr/ADR-001-dynamodb-local.md).
 - [ADR-003](docs/adr/ADR-003-transactional-outbox.md) — Transactional outbox com GSI esparso
 - [ADR-004](docs/adr/ADR-004-fila-local-sqlite.md) — Fila local sobre SQLite
 - [ADR-005](docs/adr/ADR-005-idempotencia-no-consumo.md) — Marcador e resultado como um unico item
+- [ADR-006](docs/adr/ADR-006-entity-resolution.md) — Blocking, pontuacao e clusterizacao auditavel
+- [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador

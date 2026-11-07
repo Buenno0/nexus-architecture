@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import boto3
 from botocore.exceptions import ClientError, EndpointConnectionError
@@ -27,6 +27,7 @@ logger = get_logger(__name__)
 GSI_NATURAL = "gsi_natural"
 GSI_RECENCY = "gsi_recency"
 GSI_OUTBOX_PENDING = "gsi_outbox_pending"
+GSI_REVIEW = "gsi_review"
 
 TTL_ATTRIBUTE = "expires_at"
 
@@ -79,6 +80,8 @@ def table_definition(table_name: str) -> dict[str, Any]:
             {"AttributeName": "record_id", "AttributeType": "S"},
             {"AttributeName": "pending_shard", "AttributeType": "S"},
             {"AttributeName": "next_attempt_at", "AttributeType": "S"},
+            {"AttributeName": "review_shard", "AttributeType": "S"},
+            {"AttributeName": "created_at", "AttributeType": "S"},
         ],
         "GlobalSecondaryIndexes": [
             {
@@ -109,6 +112,15 @@ def table_definition(table_name: str) -> dict[str, Any]:
                 ],
                 "Projection": {"ProjectionType": "KEYS_ONLY"},
             },
+            {
+                # Padrao 11: pares pendentes de revisao. ESPARSO, como o outbox.
+                "IndexName": GSI_REVIEW,
+                "KeySchema": [
+                    {"AttributeName": "review_shard", "KeyType": "HASH"},
+                    {"AttributeName": "created_at", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "KEYS_ONLY"},
+            },
         ],
     }
 
@@ -135,8 +147,51 @@ def wait_for_dynamodb(client: DynamoDBClient, *, timeout_seconds: float = 60.0) 
             time.sleep(1.0)
 
 
+def ensure_indexes(
+    client: DynamoDBClient, table_name: str, existing: list[dict[str, Any]]
+) -> list[str]:
+    """Cria os indices secundarios que faltam numa tabela ja existente.
+
+    Sem isso, um indice novo so chegaria a tabelas criadas do zero — e uma base com
+    dados ficaria permanentemente sem ele. O DynamoDB aceita a criacao de **um indice
+    por vez**, entao a funcao cria um e devolve; a proxima chamada cria o seguinte.
+
+    Devolve os nomes dos indices criados nesta chamada.
+    """
+    definition = table_definition(table_name)
+    desired = {gsi["IndexName"]: gsi for gsi in definition["GlobalSecondaryIndexes"]}
+    present = {gsi["IndexName"] for gsi in existing}
+    missing = [name for name in desired if name not in present]
+
+    if not missing:
+        return []
+
+    name = missing[0]
+    logger.info("creating_index", extra={"table": table_name, "index": name})
+    try:
+        client.update_table(
+            TableName=table_name,
+            AttributeDefinitions=definition["AttributeDefinitions"],
+            GlobalSecondaryIndexUpdates=[{"Create": desired[name]}],
+        )
+    except ClientError as exc:
+        # Outro processo pode estar criando o mesmo indice; nao e fatal.
+        logger.warning(
+            "index_creation_skipped",
+            extra={"table": table_name, "index": name, "reason": str(exc)},
+        )
+        return []
+
+    if len(missing) > 1:
+        logger.info(
+            "indexes_still_missing",
+            extra={"table": table_name, "pending": missing[1:]},
+        )
+    return [name]
+
+
 def ensure_table(client: DynamoDBClient | None = None, settings: Settings | None = None) -> str:
-    """Cria a tabela se nao existir. Idempotente.
+    """Cria a tabela se nao existir e completa os indices que faltarem. Idempotente.
 
     Devolve o nome da tabela.
     """
@@ -145,8 +200,12 @@ def ensure_table(client: DynamoDBClient | None = None, settings: Settings | None
     table_name = settings.dynamo_table
 
     try:
-        client.describe_table(TableName=table_name)
+        described = client.describe_table(TableName=table_name)
         logger.info("table_already_exists", extra={"table": table_name})
+        existing_indexes = cast(
+            "list[dict[str, Any]]", described["Table"].get("GlobalSecondaryIndexes", [])
+        )
+        ensure_indexes(client, table_name, existing_indexes)
         return table_name
     except client.exceptions.ResourceNotFoundException:
         pass

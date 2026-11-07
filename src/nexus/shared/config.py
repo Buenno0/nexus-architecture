@@ -13,7 +13,7 @@ import socket
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "aws"]
@@ -73,6 +73,32 @@ class Settings(BaseSettings):
         ),
     )
 
+    # Entity Resolution — Fase 5
+    resolution_match_threshold: float = Field(default=0.85, ge=0.0, le=1.0)
+    resolution_possible_threshold: float = Field(default=0.65, ge=0.0, le=1.0)
+    resolution_min_compared_fields: int = Field(default=2, ge=1, le=10)
+    resolution_max_candidates: int = Field(default=200, ge=1, le=5_000)
+    resolution_max_cluster_size: int = Field(default=50, ge=2, le=10_000)
+    resolution_review_shards: int = Field(default=2, ge=1, le=64)
+    #: Campos cuja correspondencia exata dispensa a guarda de campos minimos.
+    resolution_strong_fields: tuple[str, ...] = ("document",)
+    resolution_weights: dict[str, dict[str, float]] = Field(
+        default_factory=lambda: {
+            "person": {
+                "document": 0.45,
+                "email": 0.25,
+                "full_name": 0.20,
+                "phone": 0.10,
+            },
+            "organization": {
+                "document": 0.45,
+                "legal_name": 0.25,
+                "email": 0.20,
+                "phone": 0.10,
+            },
+        }
+    )
+
     # Limites de seguranca e custo
     max_batch_records: int = Field(default=10_000, ge=1, le=100_000)
     max_field_length: int = Field(default=512, ge=1)
@@ -94,6 +120,19 @@ class Settings(BaseSettings):
     @property
     def queue_enabled(self) -> bool:
         return self.queue_backend != "none"
+
+    @model_validator(mode="after")
+    def _coherent_thresholds(self) -> Settings:
+        """O limiar de correspondencia precisa ser maior que o de possivel.
+
+        Invertidos, toda correspondencia provavel viraria certa — a faixa intermediaria
+        que impede fusao automatica em duvida deixaria de existir (ADR-002).
+        """
+        if self.resolution_possible_threshold > self.resolution_match_threshold:
+            raise ValueError(
+                "resolution_possible_threshold nao pode ser maior que resolution_match_threshold"
+            )
+        return self
 
 
 @lru_cache(maxsize=1)

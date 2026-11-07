@@ -59,7 +59,7 @@ class Worker:
         self._settings = settings or get_settings()
         self._repo = repository
         self._queue = queue
-        self._processor = processor or build_processor(self._settings)
+        self._processor = processor or build_processor(self._settings, repository)
 
     def process_once(self, *, max_messages: int | None = None) -> WorkerReport:
         """Consome um unico lote e termina."""
@@ -109,7 +109,10 @@ class Worker:
 
         # Consulta antecipada: evita trabalho desnecessario numa reentrega.
         # NAO e a garantia — entre esta leitura e a escrita existe janela de corrida.
-        if self._repo.find_processing_result(message.record_id) is not None:
+        if (
+            self._repo.find_processing_result(message.record_id, self._processor.version)
+            is not None
+        ):
             logger.info("worker_already_processed", extra={"record_id": message.record_id})
             self._queue.delete(message.receipt)
             return "skipped"
@@ -145,6 +148,7 @@ class Worker:
             summary=summary,
             correlation_id=message.correlation_id,
             processed_at=utcnow(),
+            processor_version=self._processor.version,
         )
 
         try:

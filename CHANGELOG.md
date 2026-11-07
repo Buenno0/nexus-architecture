@@ -6,6 +6,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 5 — Nexus Entity Resolution**
+
+- Blocking com chaves proprias (documento, e-mail, nome, telefone), teto de candidatos
+  e sinalizacao explicita de truncagem.
+- Comparadores com piso de similaridade: Jaro-Winkler, Levenshtein, subconjunto de
+  tokens para nomes, e-mail separando parte local e dominio, telefone por sufixo.
+- Pontuacao ponderada sobre campos presentes nos dois registros, com guarda de campos
+  minimos e excecao para identificadores fortes.
+- Tres faixas de decisao; `POSSIBLE_MATCH` nunca funde sozinho.
+- Fecho transitivo auditavel: cada vinculo guarda o par e a evidencia; cada fusao gera
+  evento com a entidade de origem; teto de cluster recusa e sinaliza.
+- Concorrencia otimista por versao de entidade, reaproveitando a retentativa da Fase 2.
+- Fila de revisao com indice esparso, confirmacao e recusa.
+- Versionamento do processador no marcador e `POST /v1/ops/reprocess`.
+- `ensure_table` aditivo: cria indices faltantes em tabelas existentes.
+- Gabarito sintetico (`--manifest`) e `tools/evaluate_resolution.py` com precisao,
+  recall e F1.
+- 135 testes novos (402 no total), 97% de cobertura no pacote de resolucao.
+- ADR-006 (blocking, pontuacao e clusterizacao) e ADR-007 (versionamento do processador).
+
 **Fase 2 — Nexus Queue Engine**
 
 - Fila local sobre SQLite com publicacao idempotente, reivindicacao atomica
@@ -48,6 +68,20 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 - ADR-001 (DynamoDB Local), ADR-002 (identidade e idempotencia), ADR-003 (outbox).
 
 ### Corrigido
+
+**Fase 5**
+
+- **O marcador de processamento impedia melhoria.** Com `PROCESSED#<record_id>` sem
+  versao, trocar o processador nao reprocessaria nada: o marcador antigo existe e a
+  escrita condicional recusaria. O acervo ficaria fora da resolucao em silencio,
+  contado como `ja_processado`. Corrigido pelo ADR-007.
+- **Nome do meio omitido pontuava zero.** "Enzo Cunha" contra "Enzo Gabriel da Cunha"
+  dava 0,000: Jaro-Winkler e `token_sort_ratio` ficam abaixo do piso. Um par com
+  documento, e-mail e telefone identicos caia para revisao. Corrigido com criterio de
+  subconjunto de tokens, elevando o recall de 0,982 para 1,000 sem introduzir falso
+  positivo.
+- **O gerador produzia variantes triviais.** Alterar apenas o telefone tornava a
+  avaliacao inutil. Agora varia nome, e-mail, documento e campos ausentes.
 
 **Fase 2**
 

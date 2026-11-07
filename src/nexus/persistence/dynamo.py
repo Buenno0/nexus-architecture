@@ -18,13 +18,18 @@ from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import BotoCoreError, ClientError
 
 from nexus.persistence.models import (
+    Entity,
+    EntityMember,
     IdempotencyRecord,
+    MergeEvent,
     OutboxEvent,
     OutboxStatus,
     Page,
     ProcessingResult,
     ProcessingStatus,
     RecordType,
+    ReviewItem,
+    ReviewStatus,
     StoredRecord,
 )
 from nexus.persistence.repository import CommitConflictError, RecordRepository
@@ -32,12 +37,18 @@ from nexus.persistence.tables import (
     GSI_NATURAL,
     GSI_OUTBOX_PENDING,
     GSI_RECENCY,
+    GSI_REVIEW,
     build_client,
     ensure_table,
     wait_for_dynamodb,
 )
+from nexus.shared.clock import utcnow
 from nexus.shared.config import Settings, get_settings
-from nexus.shared.errors import InvalidPaginationCursorError, PersistenceError
+from nexus.shared.errors import (
+    InvalidPaginationCursorError,
+    PersistenceError,
+    RecordNotFoundError,
+)
 from nexus.shared.identity import idempotency_scope
 from nexus.shared.logging import get_logger
 
@@ -138,18 +149,51 @@ def outbox_pk(event_id: str) -> str:
     return f"OUTBOX#{event_id}"
 
 
-def processed_pk(record_id: str) -> str:
-    """Chave do marcador de processamento — ADR-005.
+def processed_pk(record_id: str, version: str) -> str:
+    """Chave do marcador de processamento — ADR-005 e ADR-007.
 
     Derivada do ``record_id``, nao do ``event_id``: a unicidade que importa e "esta
     observacao foi processada", e uma observacao pode receber mais de um evento se o
     outbox republicar.
+
+    A versao do processador entra na chave. Sem ela, trocar o processador nao
+    reprocessaria nada — o marcador antigo existe e a escrita condicional recusaria.
+    Com ela, a chave nova nao colide, o acervo reprocessa e o resultado anterior
+    permanece consultavel.
     """
-    return f"PROCESSED#{record_id}"
+    return f"PROCESSED#{record_id}#{version}"
 
 
 def recency_pk(record_type: RecordType) -> str:
     return f"RECORDS#{record_type.value}"
+
+
+# ------------------------------------------------------------- entity resolution
+
+#: Limite do DynamoDB para itens numa transacao.
+TRANSACT_MAX_ITEMS = 100
+
+STATS_KEY = "STATS#resolution"
+
+
+def block_pk(key: str) -> str:
+    return f"BLOCK#{key}"
+
+
+def entity_pk(entity_id: str) -> str:
+    return f"ENTITY#{entity_id}"
+
+
+def member_sk(record_id: str) -> str:
+    return f"MEMBER#{record_id}"
+
+
+def merge_sk(event_id: str) -> str:
+    return f"MERGE#{event_id}"
+
+
+def review_pk(pair_id: str) -> str:
+    return f"REVIEW#{pair_id}"
 
 
 # ------------------------------------------------------------------------- cursores
@@ -244,7 +288,7 @@ def _item_to_event(data: ItemDict) -> OutboxEvent:
 
 
 def _processing_to_item(result: ProcessingResult) -> ItemDict:
-    key = processed_pk(result.record_id)
+    key = processed_pk(result.record_id, result.processor_version)
     return {
         "pk": key,
         "sk": key,
@@ -252,6 +296,7 @@ def _processing_to_item(result: ProcessingResult) -> ItemDict:
         "record_id": result.record_id,
         "event_id": result.event_id,
         "status": result.status.value,
+        "processor_version": result.processor_version,
         "worker_id": result.worker_id,
         "attempts": result.attempts,
         "duration_ms": result.duration_ms,
@@ -272,6 +317,147 @@ def _item_to_processing(data: ItemDict) -> ProcessingResult:
         summary=dict(data.get("summary") or {}),
         correlation_id=str(data.get("correlation_id", "")),
         processed_at=_parse_dt(data["processed_at"]),
+        processor_version=str(data.get("processor_version", "pipeline-v1")),
+    )
+
+
+def _entity_to_item(entity: Entity) -> ItemDict:
+    key = entity_pk(entity.entity_id)
+    return {
+        "pk": key,
+        "sk": key,
+        "entity": "entity",
+        "entity_id": entity.entity_id,
+        "record_type": entity.record_type.value,
+        "member_count": entity.member_count,
+        "version": entity.version,
+        "created_at": entity.created_at.isoformat(),
+        "updated_at": entity.updated_at.isoformat(),
+        "flagged": entity.flagged,
+        "flag_reason": entity.flag_reason,
+    }
+
+
+def _item_to_entity(data: ItemDict) -> Entity:
+    return Entity(
+        entity_id=str(data["entity_id"]),
+        record_type=RecordType(data["record_type"]),
+        member_count=_as_int(data.get("member_count")),
+        version=_as_int(data.get("version")),
+        created_at=_parse_dt(data["created_at"]),
+        updated_at=_parse_dt(data["updated_at"]),
+        flagged=bool(data.get("flagged", False)),
+        flag_reason=data.get("flag_reason"),
+    )
+
+
+def _member_to_item(member: EntityMember) -> ItemDict:
+    return {
+        "pk": entity_pk(member.entity_id),
+        "sk": member_sk(member.record_id),
+        "entity": "entity_member",
+        "entity_id": member.entity_id,
+        "record_id": member.record_id,
+        "joined_at": member.joined_at.isoformat(),
+        "score": member.score,
+        "matched_record_id": member.matched_record_id,
+        "evidence": member.evidence,
+    }
+
+
+def _item_to_member(data: ItemDict) -> EntityMember:
+    return EntityMember(
+        entity_id=str(data["entity_id"]),
+        record_id=str(data["record_id"]),
+        joined_at=_parse_dt(data["joined_at"]),
+        score=float(data.get("score") or 0.0),
+        matched_record_id=data.get("matched_record_id"),
+        evidence=dict(data.get("evidence") or {}),
+    )
+
+
+def _merge_to_item(event: MergeEvent) -> ItemDict:
+    return {
+        "pk": entity_pk(event.entity_id),
+        "sk": merge_sk(event.event_id),
+        "entity": "merge_event",
+        "entity_id": event.entity_id,
+        "event_id": event.event_id,
+        "source_entity_id": event.source_entity_id,
+        "record_a": event.record_a,
+        "record_b": event.record_b,
+        "score": event.score,
+        "moved_members": event.moved_members,
+        "created_at": event.created_at.isoformat(),
+    }
+
+
+def _item_to_merge(data: ItemDict) -> MergeEvent:
+    return MergeEvent(
+        entity_id=str(data["entity_id"]),
+        event_id=str(data["event_id"]),
+        source_entity_id=str(data["source_entity_id"]),
+        record_a=str(data["record_a"]),
+        record_b=str(data["record_b"]),
+        score=float(data.get("score") or 0.0),
+        moved_members=_as_int(data.get("moved_members")),
+        created_at=_parse_dt(data["created_at"]),
+    )
+
+
+def _link_to_item(record_id: str, entity_id: str) -> ItemDict:
+    """Vinculo reverso: fica na particao da observacao.
+
+    Permite descobrir a entidade de um registro na mesma `Query` que le o registro —
+    o beneficio concreto da modelagem single-table.
+    """
+    return {
+        "pk": record_pk(record_id),
+        "sk": entity_pk(entity_id),
+        "entity": "entity_link",
+        "record_id": record_id,
+        "entity_id": entity_id,
+    }
+
+
+def _review_to_item(item: ReviewItem) -> ItemDict:
+    key = review_pk(item.pair_id)
+    payload: ItemDict = {
+        "pk": key,
+        "sk": key,
+        "entity": "review",
+        "pair_id": item.pair_id,
+        "record_a": item.record_a,
+        "record_b": item.record_b,
+        "record_type": item.record_type.value,
+        "score": item.score,
+        "evidence": item.evidence,
+        "status": item.status.value,
+        "created_at": item.created_at.isoformat(),
+        "decided_at": item.decided_at.isoformat() if item.decided_at else None,
+        "reason": item.reason,
+    }
+    # Presente apenas enquanto pendente: e o que torna gsi_review esparso.
+    if item.review_shard is not None:
+        payload["review_shard"] = item.review_shard
+    return payload
+
+
+def _item_to_review(data: ItemDict) -> ReviewItem:
+    shard = data.get("review_shard")
+    decided = data.get("decided_at")
+    return ReviewItem(
+        pair_id=str(data["pair_id"]),
+        record_a=str(data["record_a"]),
+        record_b=str(data["record_b"]),
+        record_type=RecordType(data["record_type"]),
+        score=float(data.get("score") or 0.0),
+        evidence=dict(data.get("evidence") or {}),
+        created_at=_parse_dt(data["created_at"]),
+        status=ReviewStatus(data.get("status", "pending")),
+        review_shard=str(shard) if shard is not None else None,
+        decided_at=_parse_dt(decided) if decided else None,
+        reason=data.get("reason"),
     )
 
 
@@ -513,8 +699,8 @@ class DynamoRecordRepository(RecordRepository):
         except (ClientError, BotoCoreError) as exc:
             raise self._fail("commit_processing", exc) from exc
 
-    def find_processing_result(self, record_id: str) -> ProcessingResult | None:
-        key = processed_pk(record_id)
+    def find_processing_result(self, record_id: str, version: str) -> ProcessingResult | None:
+        key = processed_pk(record_id, version)
         try:
             response = self._client.get_item(
                 TableName=self._table,
@@ -649,6 +835,424 @@ class DynamoRecordRepository(RecordRepository):
             str(_deserializer.deserialize(item["pk"])).removeprefix("OUTBOX#")
             for item in response.get("Items") or []
         ]
+
+    # ------------------------------------------------- entity resolution: blocos
+
+    def put_blocking_keys(self, record_id: str, record_type: RecordType, keys: list[str]) -> None:
+        if not keys:
+            return
+        now = utcnow().isoformat()
+        try:
+            for key in keys:
+                self._client.put_item(
+                    TableName=self._table,
+                    Item=_to_item(
+                        {
+                            "pk": block_pk(key),
+                            "sk": record_pk(record_id),
+                            "entity": "block",
+                            "block_key": key,
+                            "record_id": record_id,
+                            "record_type": record_type.value,
+                            "indexed_at": now,
+                        }
+                    ),
+                )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("put_blocking_keys", exc) from exc
+
+    def find_block_candidates(
+        self, keys: list[str], *, limit: int, exclude: str | None = None
+    ) -> tuple[list[str], bool]:
+        found: list[str] = []
+        seen: set[str] = set()
+        truncated = False
+
+        for key in keys:
+            if len(found) >= limit:
+                truncated = True
+                break
+            try:
+                response = self._client.query(
+                    TableName=self._table,
+                    KeyConditionExpression="pk = :pk",
+                    ExpressionAttributeValues={":pk": {"S": block_pk(key)}},
+                    Limit=limit - len(found) + 1,
+                )
+            except (ClientError, BotoCoreError) as exc:
+                raise self._fail("find_block_candidates", exc) from exc
+
+            items = response.get("Items") or []
+            if response.get("LastEvaluatedKey"):
+                truncated = True
+            for raw in items:
+                data = _from_item(raw)
+                candidate = str(data["record_id"])
+                if candidate == exclude or candidate in seen:
+                    continue
+                if len(found) >= limit:
+                    truncated = True
+                    break
+                seen.add(candidate)
+                found.append(candidate)
+
+        return found, truncated
+
+    # ----------------------------------------------- entity resolution: entidades
+
+    def get_entity(self, entity_id: str) -> Entity | None:
+        key = entity_pk(entity_id)
+        try:
+            response = self._client.get_item(
+                TableName=self._table,
+                Key={"pk": {"S": key}, "sk": {"S": key}},
+                ConsistentRead=True,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("get_entity", exc) from exc
+        item = response.get("Item")
+        return _item_to_entity(_from_item(item)) if item else None
+
+    def find_entity_id_for_record(self, record_id: str) -> str | None:
+        try:
+            response = self._client.query(
+                TableName=self._table,
+                KeyConditionExpression="pk = :pk AND begins_with(sk, :prefix)",
+                ExpressionAttributeValues={
+                    ":pk": {"S": record_pk(record_id)},
+                    ":prefix": {"S": "ENTITY#"},
+                },
+                ConsistentRead=True,
+                Limit=1,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("find_entity_id_for_record", exc) from exc
+        items = response.get("Items") or []
+        return str(_from_item(items[0])["entity_id"]) if items else None
+
+    def _query_entity_children(self, entity_id: str, prefix: str) -> list[ItemDict]:
+        collected: list[ItemDict] = []
+        start_key: ItemDict | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self._table,
+                "KeyConditionExpression": "pk = :pk AND begins_with(sk, :prefix)",
+                "ExpressionAttributeValues": {
+                    ":pk": {"S": entity_pk(entity_id)},
+                    ":prefix": {"S": prefix},
+                },
+            }
+            if start_key:
+                kwargs["ExclusiveStartKey"] = start_key
+            try:
+                response = self._client.query(**kwargs)
+            except (ClientError, BotoCoreError) as exc:
+                raise self._fail("query_entity_children", exc) from exc
+            collected.extend(_from_item(raw) for raw in response.get("Items") or [])
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                return collected
+
+    def list_entity_members(self, entity_id: str) -> list[EntityMember]:
+        return [_item_to_member(data) for data in self._query_entity_children(entity_id, "MEMBER#")]
+
+    def list_merge_events(self, entity_id: str) -> list[MergeEvent]:
+        return [_item_to_merge(data) for data in self._query_entity_children(entity_id, "MERGE#")]
+
+    def create_entity(self, entity: Entity, members: list[EntityMember]) -> None:
+        actions: list[dict[str, Any]] = [
+            {
+                "Put": {
+                    "TableName": self._table,
+                    "Item": _to_item(_entity_to_item(entity)),
+                    "ConditionExpression": "attribute_not_exists(pk)",
+                }
+            }
+        ]
+        for member in members:
+            actions.append(
+                {"Put": {"TableName": self._table, "Item": _to_item(_member_to_item(member))}}
+            )
+            actions.append(
+                {
+                    "Put": {
+                        "TableName": self._table,
+                        "Item": _to_item(_link_to_item(member.record_id, entity.entity_id)),
+                    }
+                }
+            )
+        self._transact("create_entity", actions)
+
+    def add_member(self, entity: Entity, member: EntityMember) -> Entity:
+        now = utcnow()
+        self._transact(
+            "add_member",
+            [
+                {
+                    "Update": {
+                        "TableName": self._table,
+                        "Key": {
+                            "pk": {"S": entity_pk(entity.entity_id)},
+                            "sk": {"S": entity_pk(entity.entity_id)},
+                        },
+                        "UpdateExpression": (
+                            "SET member_count = member_count + :one, "
+                            "#v = #v + :one, updated_at = :now"
+                        ),
+                        "ExpressionAttributeNames": {"#v": "version"},
+                        "ExpressionAttributeValues": {
+                            ":one": {"N": "1"},
+                            ":now": {"S": now.isoformat()},
+                            ":version": {"N": str(entity.version)},
+                        },
+                        # Concorrencia otimista: se outro worker mexeu na entidade
+                        # desde a leitura, esta escrita falha e a mensagem e retentada.
+                        "ConditionExpression": "#v = :version",
+                    }
+                },
+                {"Put": {"TableName": self._table, "Item": _to_item(_member_to_item(member))}},
+                {
+                    "Put": {
+                        "TableName": self._table,
+                        "Item": _to_item(_link_to_item(member.record_id, entity.entity_id)),
+                    }
+                },
+            ],
+        )
+        from dataclasses import replace
+
+        return replace(
+            entity,
+            member_count=entity.member_count + 1,
+            version=entity.version + 1,
+            updated_at=now,
+        )
+
+    def merge_entities(
+        self, target: Entity, source: Entity, members: list[EntityMember], event: MergeEvent
+    ) -> Entity:
+        """Move os vinculos da origem para o destino numa unica transacao.
+
+        Cada membro movido custa tres operacoes (gravar no destino, apagar da origem,
+        atualizar o vinculo reverso). Com o teto de tamanho de cluster, o total fica
+        confortavelmente abaixo do limite de 100 itens por transacao do DynamoDB.
+        """
+        now = utcnow()
+        required = len(members) * 3 + 3
+        if required > TRANSACT_MAX_ITEMS:
+            raise PersistenceError(
+                f"fusao exigiria {required} operacoes, acima do limite de {TRANSACT_MAX_ITEMS}"
+            )
+
+        actions: list[dict[str, Any]] = [
+            {
+                "Update": {
+                    "TableName": self._table,
+                    "Key": {
+                        "pk": {"S": entity_pk(target.entity_id)},
+                        "sk": {"S": entity_pk(target.entity_id)},
+                    },
+                    "UpdateExpression": (
+                        "SET member_count = member_count + :moved, "
+                        "#v = #v + :one, updated_at = :now"
+                    ),
+                    "ExpressionAttributeNames": {"#v": "version"},
+                    "ExpressionAttributeValues": {
+                        ":moved": {"N": str(len(members))},
+                        ":one": {"N": "1"},
+                        ":now": {"S": now.isoformat()},
+                        ":version": {"N": str(target.version)},
+                    },
+                    "ConditionExpression": "#v = :version",
+                }
+            },
+            {
+                "Delete": {
+                    "TableName": self._table,
+                    "Key": {
+                        "pk": {"S": entity_pk(source.entity_id)},
+                        "sk": {"S": entity_pk(source.entity_id)},
+                    },
+                    "ExpressionAttributeNames": {"#v": "version"},
+                    "ExpressionAttributeValues": {":version": {"N": str(source.version)}},
+                    "ConditionExpression": "#v = :version",
+                }
+            },
+            {"Put": {"TableName": self._table, "Item": _to_item(_merge_to_item(event))}},
+        ]
+
+        from dataclasses import replace as _replace
+
+        for member in members:
+            moved = _replace(member, entity_id=target.entity_id)
+            actions.append(
+                {"Put": {"TableName": self._table, "Item": _to_item(_member_to_item(moved))}}
+            )
+            actions.append(
+                {
+                    "Delete": {
+                        "TableName": self._table,
+                        "Key": {
+                            "pk": {"S": entity_pk(source.entity_id)},
+                            "sk": {"S": member_sk(member.record_id)},
+                        },
+                    }
+                }
+            )
+            actions.append(
+                {
+                    "Put": {
+                        "TableName": self._table,
+                        "Item": _to_item(_link_to_item(member.record_id, target.entity_id)),
+                    }
+                }
+            )
+
+        self._transact("merge_entities", actions)
+        return _replace(
+            target,
+            member_count=target.member_count + len(members),
+            version=target.version + 1,
+            updated_at=now,
+        )
+
+    def flag_entity(self, entity_id: str, reason: str) -> None:
+        try:
+            self._client.update_item(
+                TableName=self._table,
+                Key={"pk": {"S": entity_pk(entity_id)}, "sk": {"S": entity_pk(entity_id)}},
+                UpdateExpression="SET flagged = :t, flag_reason = :r, updated_at = :now",
+                ExpressionAttributeValues={
+                    ":t": {"BOOL": True},
+                    ":r": {"S": reason[:512]},
+                    ":now": {"S": utcnow().isoformat()},
+                },
+                ConditionExpression="attribute_exists(pk)",
+            )
+        except self._client.exceptions.ConditionalCheckFailedException:
+            logger.warning("flag_entity_missing", extra={"entity_id": entity_id})
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("flag_entity", exc) from exc
+
+    # -------------------------------------------------- entity resolution: revisao
+
+    def put_review(self, item: ReviewItem) -> bool:
+        try:
+            self._client.put_item(
+                TableName=self._table,
+                Item=_to_item(_review_to_item(item)),
+                ConditionExpression="attribute_not_exists(pk)",
+            )
+        except self._client.exceptions.ConditionalCheckFailedException:
+            logger.info("review_already_known", extra={"pair_id": item.pair_id})
+            return False
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("put_review", exc) from exc
+        return True
+
+    def get_review(self, pair_id: str) -> ReviewItem | None:
+        key = review_pk(pair_id)
+        try:
+            response = self._client.get_item(
+                TableName=self._table,
+                Key={"pk": {"S": key}, "sk": {"S": key}},
+                ConsistentRead=True,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("get_review", exc) from exc
+        item = response.get("Item")
+        return _item_to_review(_from_item(item)) if item else None
+
+    def list_pending_reviews(self, *, limit: int) -> list[ReviewItem]:
+        pair_ids: list[str] = []
+        for shard_index in range(self._settings.resolution_review_shards):
+            if len(pair_ids) >= limit:
+                break
+            try:
+                response = self._client.query(
+                    TableName=self._table,
+                    IndexName=GSI_REVIEW,
+                    KeyConditionExpression="review_shard = :s",
+                    ExpressionAttributeValues={":s": {"S": f"REVIEW#{shard_index}"}},
+                    Limit=limit - len(pair_ids),
+                )
+            except (ClientError, BotoCoreError) as exc:
+                raise self._fail("list_pending_reviews", exc) from exc
+            # Projecao KEYS_ONLY: o indice da a chave, o conteudo vem da tabela base.
+            for raw in response.get("Items") or []:
+                pair_ids.append(str(_deserializer.deserialize(raw["pk"])).removeprefix("REVIEW#"))
+
+        reviews = [self.get_review(pair_id) for pair_id in pair_ids]
+        return [review for review in reviews if review is not None]
+
+    def decide_review(self, pair_id: str, status: ReviewStatus, reason: str | None) -> ReviewItem:
+        key = review_pk(pair_id)
+        values: dict[str, Any] = {
+            ":status": {"S": status.value},
+            ":now": {"S": utcnow().isoformat()},
+        }
+        update = "SET #st = :status, decided_at = :now REMOVE review_shard"
+        if reason:
+            update = "SET #st = :status, decided_at = :now, reason = :reason REMOVE review_shard"
+            values[":reason"] = {"S": reason[:512]}
+
+        try:
+            self._client.update_item(
+                TableName=self._table,
+                Key={"pk": {"S": key}, "sk": {"S": key}},
+                UpdateExpression=update,
+                ExpressionAttributeNames={"#st": "status"},
+                ExpressionAttributeValues=values,
+                ConditionExpression="attribute_exists(pk)",
+            )
+        except self._client.exceptions.ConditionalCheckFailedException as exc:
+            raise RecordNotFoundError("Par de revisao nao encontrado") from exc
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("decide_review", exc) from exc
+
+        decided = self.get_review(pair_id)
+        if decided is None:
+            raise PersistenceError("Par de revisao desapareceu apos a decisao")
+        return decided
+
+    # ------------------------------------------------ entity resolution: metricas
+
+    def increment_resolution_stats(self, **counters: int) -> None:
+        if not counters:
+            return
+        names = {f"#c{i}": name for i, name in enumerate(counters)}
+        values = {f":v{i}": {"N": str(value)} for i, value in enumerate(counters.values())}
+        expression = "ADD " + ", ".join(f"{alias} :v{i}" for i, alias in enumerate(names))
+        try:
+            self._client.update_item(
+                TableName=self._table,
+                Key={"pk": {"S": STATS_KEY}, "sk": {"S": STATS_KEY}},
+                UpdateExpression=expression,
+                ExpressionAttributeNames=names,
+                ExpressionAttributeValues=values,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            # Metrica nunca derruba o processamento que ela descreve.
+            logger.warning("resolution_stats_failed", extra={"reason": str(exc)})
+
+    def get_resolution_stats(self) -> dict[str, int]:
+        try:
+            response = self._client.get_item(
+                TableName=self._table,
+                Key={"pk": {"S": STATS_KEY}, "sk": {"S": STATS_KEY}},
+                ConsistentRead=True,
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("get_resolution_stats", exc) from exc
+        item = response.get("Item")
+        if not item:
+            return {}
+        data = _from_item(item)
+        return {
+            name: _as_int(value)
+            for name, value in data.items()
+            if name not in {"pk", "sk", "entity"} and isinstance(value, int | float)
+        }
 
     def count_pending_outbox(self) -> int:
         total = 0
