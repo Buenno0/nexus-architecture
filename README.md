@@ -16,13 +16,15 @@ processados de forma assincrona, correlacionados e monitorados.
 |---|---|---|
 | Nexus Ingestion | 1 | Implementado |
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
-| Cloud Infrastructure | 3 | Nao iniciado |
+| Cloud Infrastructure | 3 | Implementado — **nao implantado**, custo US$ 0,00 |
 | Nexus Control Center | 4 | Nao iniciado |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Parcial (logging estruturado) |
 | Performance Engineering | 7 | Nao iniciado |
 
-Nenhum recurso de nuvem foi provisionado. O projeto roda inteiramente na maquina local.
+Nenhum recurso de nuvem foi provisionado. O projeto roda inteiramente na maquina
+local. A Fase 3 entregou a infraestrutura como codigo pronta para aplicar — ver
+[docs/runbook-deploy.md](docs/runbook-deploy.md).
 
 ---
 
@@ -95,6 +97,21 @@ make reprocess && make drain && make resolution
 make reviews
 ```
 
+## AWS (Fase 3) — construida, nao implantada
+
+```bash
+make lambda
+```
+
+```bash
+make tf-validate
+```
+
+O deploy e um ato seu, com custo conhecido: siga
+[docs/runbook-deploy.md](docs/runbook-deploy.md). Estimativa de ~US$ 0,70/mes, dos
+quais US$ 0,50 sao a hosted zone do Route 53 — o unico custo fixo. Ver
+[COSTS.md](COSTS.md).
+
 ### Medir a qualidade da resolucao
 
 ```bash
@@ -163,6 +180,8 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-005](docs/adr/ADR-005-idempotencia-no-consumo.md) — Idempotencia no consumo
   - [ADR-006](docs/adr/ADR-006-entity-resolution.md) — Blocking, pontuacao e clusterizacao
   - [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador
+  - [ADR-008](docs/adr/ADR-008-arquitetura-serverless.md) — Arquitetura serverless na AWS
+- [docs/runbook-deploy.md](docs/runbook-deploy.md) — procedimento de deploy e destruicao
 
 ## Limitacoes conhecidas
 
@@ -176,6 +195,8 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **Nao ha interface de revisao**, apenas endpoints. A tela e escopo da Fase 4.
 - **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
   culpada, mas reverte-la e manual.
+- **Nada foi validado contra a AWS real.** `moto` simula a API do SQS, nao o servico:
+  nao exercita latencia, limites de taxa nem consistencia eventual.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.
 - **Metricas sao do processo**: zeram no reinicio e nao agregam entre replicas.

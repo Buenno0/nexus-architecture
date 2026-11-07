@@ -72,6 +72,19 @@ Crash **depois** de publicar e **antes** de limpar republica o evento. Aceitavel
 entrega e at-least-once e a idempotencia no consumo absorve. Perder o evento seria
 inaceitavel; entrega-lo duas vezes, nao.
 
+> **Correcao (2026-11-07, durante a Fase 3).** A versao original desta ADR rejeitava o
+> event source mapping dizendo que ele faria "long-polling continuo: custo com fila
+> vazia". **O argumento de custo nao se sustenta.** Com long polling de 20 segundos e
+> fila ociosa, um poller gera ~129.600 requisicoes por mes e cinco pollers ~648.000 —
+> ambos dentro da franquia permanente de 1 milhao de requisicoes por mes do SQS.
+>
+> O motivo real para nao usa-lo e outro: **ele processa sozinho**, e a plataforma
+> existe para demonstrar execucao sob demanda, com o operador no controle. E uma
+> escolha de produto, nao de custo, e e assim que passa a estar registrada.
+>
+> A decisao nao mudou; a justificativa estava errada e levaria a conclusoes erradas em
+> outros contextos.
+
 ## Consequencias
 
 **Positivas**
@@ -96,7 +109,7 @@ inaceitavel; entrega-lo duas vezes, nao.
 | Alternativa | Motivo da rejeicao |
 |---|---|
 | Publicar direto, sem outbox | Dual-write: perda silenciosa de registros |
-| DynamoDB Streams -> Lambda | Event source mapping faz long-polling continuo = custo com fila vazia |
+| DynamoDB Streams -> Lambda | Acopla o outbox ao mecanismo de stream e processa sozinho, contrariando a execucao sob demanda (ver correcao acima) |
 | Scan periodico por `status=pending` | O(n) sobre a tabela inteira; inviavel com volume |
 | GSI nao esparso com `status` como PK | Indice cresce junto com a tabela; itens ja despachados permanecem nele |
 | Dispatcher agendado (EventBridge) | Invocacoes mesmo com fila vazia; contraria execucao sob demanda |

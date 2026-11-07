@@ -28,3 +28,16 @@ dist/
 
 # Sistema
 .DS_Store
+
+# Pacote Lambda e artefatos de build
+build/
+dist/
+
+# Terraform: estado contem identificadores e nunca deve ser versionado aqui
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log

@@ -169,9 +169,12 @@ Crash **depois** de publicar e **antes** de limpar republica o evento. Aceitavel
 esperado: a entrega e at-least-once e a idempotencia no consumo absorve. O inverso —
 perder o evento — seria inaceitavel.
 
-**Descartado:** DynamoDB Streams -> Lambda. Event source mapping faz long-polling
-continuo, exatamente o padrao de custo que decidimos evitar. O GSI esparso funciona
-identico no DynamoDB Local e na AWS.
+**Descartado:** DynamoDB Streams -> Lambda, e o event source mapping SQS -> Lambda.
+Nao por custo — o polling de uma fila ociosa cabe na franquia gratuita do SQS — mas
+porque ambos processam sozinhos, desfazendo a execucao sob demanda que a plataforma
+existe para demonstrar. Ver a correcao no ADR-003.
+
+O GSI esparso funciona identico no DynamoDB Local e na AWS.
 
 Ver [ADR-003](docs/adr/ADR-003-transactional-outbox.md).
 

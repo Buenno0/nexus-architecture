@@ -1,6 +1,6 @@
 .PHONY: help up down logs test test-unit test-int lint fmt generate table clean \
         dispatch process drain queue-stats redrive pipeline reprocess resolution \
-        reviews fail-test
+        reviews fail-test lambda tf-validate tf-plan
 
 PY := .venv/bin/python
 N  ?= 100
@@ -33,6 +33,15 @@ process:   ## Consome um lote da fila
 
 drain:     ## Consome ate esvaziar a fila (ainda sob demanda, nao residente)
 	$(DC) python -m nexus.queue.worker --drain
+
+lambda:    ## Empacota a aplicacao para o AWS Lambda
+	./scripts/build_lambda.sh
+
+tf-validate: ## Valida o Terraform (nao cria nada, nao exige credenciais)
+	cd infra/terraform && terraform fmt -check && terraform init -backend=false -input=false >/dev/null && terraform validate
+
+tf-plan:   ## Mostra o que seria criado (EXIGE credenciais; nao cria nada)
+	cd infra/terraform && terraform plan -input=false
 
 reprocess: ## Reenfileira o acervo sob a versao corrente do processador
 	$(DC) python -m nexus.queue.reprocess $(if $(LIMIT),--limit $(LIMIT),)

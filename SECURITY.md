@@ -54,8 +54,34 @@ Mitigacoes atuais:
 - Todo lote tem teto rigido validado na borda (`limit`, `max_messages`).
 - Nenhuma rota apaga dados: `redrive` devolve mensagens, nao as descarta.
 
-**Antes de qualquer exposicao publica na Fase 3, estas rotas exigem autenticacao.**
-Expostas sem protecao, permitiriam a terceiros consumir recurso a vontade.
+**Resolvido na Fase 3, ainda nao implantado.** O Terraform protege todas as rotas com
+authorizer JWT do Cognito, exceto `/health`. Um segredo compartilhado nao serviria: uma
+SPA nao guarda segredo, e qualquer chave no JavaScript esta publica.
+
+Enquanto o deploy nao acontece, as rotas continuam abertas **no ambiente local**, que
+escuta apenas em `localhost`.
+
+## Postura na AWS (construida, nao implantada)
+
+| Controle | Implementacao |
+|---|---|
+| Autenticacao | Cognito User Pool + authorizer JWT; auto-cadastro desligado |
+| Autorizacao | IAM por funcao, sem `*` em Action ou Resource |
+| Credenciais | IAM Roles — nenhuma chave estatica em variavel de ambiente |
+| Rede | Sem VPC privada: isolamento por IAM (e evita NAT Gateway) |
+| CORS | Origem unica do Control Center, nunca `*` |
+| Limite de taxa | Throttling no stage do API Gateway |
+| Concorrencia | `reserved_concurrent_executions` por funcao |
+| Logs | Retencao de 7 dias |
+| Custo | Budget com alertas em US$ 5, US$ 10 e por previsao |
+
+> Consultar um GSI exige permissao no ARN **do indice**, nao apenas no da tabela. A
+> omissao produz um `AccessDenied` que so aparece na primeira consulta — motivo pelo
+> qual `${tabela}/index/*` esta explicito nas policies.
+
+**O primeiro deploy usara AdministratorAccess, que e mais do que o necessario.** O
+runbook registra isso como divida: o correto e uma role dedicada, limitada aos
+servicos do `iam.tf`.
 
 ## Resolucao de identidade
 

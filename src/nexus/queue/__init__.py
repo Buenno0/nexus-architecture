@@ -30,6 +30,11 @@ def get_queue_client() -> QueueClient:
     if settings.queue_backend == "none":
         return NullQueueClient()
 
+    if settings.queue_backend == "sqs":
+        from nexus.queue.sqs import SqsQueue
+
+        return SqsQueue(settings=settings)
+
     from nexus.queue.sqlite import SqliteQueue
 
     return SqliteQueue(settings=settings)

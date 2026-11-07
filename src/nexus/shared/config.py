@@ -17,7 +17,7 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "aws"]
-QueueBackend = Literal["none", "sqlite"]
+QueueBackend = Literal["none", "sqlite", "sqs"]
 
 
 class Settings(BaseSettings):
@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     queue_max_receive: int = Field(default=3, ge=1, le=20)
     queue_retry_backoff_base_seconds: float = Field(default=2.0, gt=0)
     queue_busy_timeout_seconds: float = Field(default=5.0, gt=0)
+    #: URLs das filas SQS. Obrigatorias quando queue_backend == "sqs".
+    sqs_queue_url: str | None = None
+    sqs_dlq_url: str | None = None
 
     # Worker
     worker_batch_size: int = Field(default=10, ge=1, le=100)
@@ -120,6 +123,17 @@ class Settings(BaseSettings):
     @property
     def queue_enabled(self) -> bool:
         return self.queue_backend != "none"
+
+    @model_validator(mode="after")
+    def _sqs_requires_urls(self) -> Settings:
+        """Falha ao subir, nao na primeira mensagem.
+
+        Sem a URL, o adaptador SQS so quebraria quando alguem tentasse publicar — bem
+        depois do deploy, provavelmente em producao.
+        """
+        if self.queue_backend == "sqs" and not self.sqs_queue_url:
+            raise ValueError("queue_backend='sqs' exige NEXUS_SQS_QUEUE_URL")
+        return self
 
     @model_validator(mode="after")
     def _coherent_thresholds(self) -> Settings:

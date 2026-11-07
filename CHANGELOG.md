@@ -6,6 +6,25 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 3 — Cloud Infrastructure (construida, nao implantada)**
+
+- Adaptador `SqsQueue` implementando o mesmo `QueueClient` da fila local.
+- **Bateria de contrato compartilhada**: a mesma verificacao roda contra `SqliteQueue`
+  e `SqsQueue`, e quebra se as duas divergirem.
+- Handlers Lambda: `api` (FastAPI via Mangum), `dispatcher` e `worker`, separados para
+  que o IAM de cada um seja minimo.
+- Terraform completo: DynamoDB com 4 GSIs, SQS + DLQ, 3 Lambdas em arm64, API Gateway
+  HTTP com authorizer JWT, Cognito, EventBridge Scheduler, AWS Budgets.
+- IAM com privilegio minimo: nenhum `*` em `Action` ou `Resource`.
+- Guard rails: concorrencia reservada, retencao de logs de 7 dias, throttling no stage,
+  `dynamodb_billing_mode` parametrizavel.
+- `scripts/build_lambda.sh` com compilacao cruzada para Linux arm64.
+- `docs/runbook-deploy.md` com deploy **e destruicao**.
+- ADR-008 documentando a arquitetura serverless.
+- 84 testes novos (486 no total).
+
+**Nenhum recurso AWS foi criado. Custo da fase: US$ 0,00.**
+
 **Fase 5 — Nexus Entity Resolution**
 
 - Blocking com chaves proprias (documento, e-mail, nome, telefone), teto de candidatos
@@ -68,6 +87,21 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 - ADR-001 (DynamoDB Local), ADR-002 (identidade e idempotencia), ADR-003 (outbox).
 
 ### Corrigido
+
+**Fase 3**
+
+- **O ADR-003 rejeitava event source mapping pelo motivo errado.** Alegava
+  "long-polling continuo: custo com fila vazia". O calculo desmente: 1 a 5 pollers com
+  long poll de 20s geram 130 mil a 650 mil requisicoes/mes, dentro da franquia
+  permanente de 1 milhao do SQS. O motivo real e que ele processa sozinho, desfazendo
+  a execucao sob demanda. Decisao mantida, justificativa corrigida.
+- **O COSTS.md subestimava o DynamoDB.** Dizia "~US$ 0" para On-Demand. A franquia
+  cobre 25 GB e 25 WCU/RCU **provisionados**, nao requisicoes On-Demand. Custo real:
+  ~US$ 0,15 por 10 mil registros, linear no volume — o que muda a conversa nos testes
+  de carga.
+- **O pacote Lambda levava o servidor Uvicorn.** `uvloop` sozinho pesava 16 MB e a
+  Lambda nao usa nenhum deles: o Mangum fala ASGI direto. Pacote caiu de 11 MB para
+  6,1 MB.
 
 **Fase 5**
 

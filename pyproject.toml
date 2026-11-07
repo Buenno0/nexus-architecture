@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.6.0",
     "boto3>=1.35.0",
     "rapidfuzz>=3.10.0",
+    "mangum>=0.19.0",
 ]
 
 [dependency-groups]
@@ -24,6 +25,7 @@ dev = [
     "boto3-stubs[dynamodb,sqs]>=1.35.0",
     "faker>=30.0.0",
     "locust>=2.32.0",
+    "moto[sqs,dynamodb]>=5.0.0",
 ]
 
 [build-system]
@@ -50,6 +52,8 @@ ignore = ["B008"]
 # A implementacao nula precisa aceitar a assinatura completa do contrato, ainda que
 # nao use os argumentos. Nao sao parametros esquecidos.
 "src/nexus/queue/client.py" = ["ARG002"]
+# A assinatura (event, context) e exigida pelo Lambda; `context` nem sempre e usado.
+"src/nexus/handlers/*.py" = ["ARG001"]
 
 [tool.mypy]
 python_version = "3.13"
