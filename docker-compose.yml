@@ -1,0 +1,56 @@
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:2.5.2
+    container_name: nexus-dynamodb
+    # -sharedDb: uma unica base, independente de credencial/regiao. Sem isso cada
+    # combinacao de credenciais enxerga um banco separado e os dados "somem".
+    command: -jar DynamoDBLocal.jar -sharedDb -dbPath /home/dynamodblocal/data
+    working_dir: /home/dynamodblocal
+    user: root
+    ports:
+      - "8000:8000"
+    volumes:
+      - dynamodb-data:/home/dynamodblocal/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'exec 3<>/dev/tcp/127.0.0.1/8000 && printf "GET / HTTP/1.0\r\n\r\n" >&3 && head -c 64 <&3 | grep -q HTTP'
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  api:
+    build: .
+    container_name: nexus-api
+    depends_on:
+      dynamodb:
+        condition: service_healthy
+    environment:
+      NEXUS_ENV: local
+      NEXUS_LOG_LEVEL: ${NEXUS_LOG_LEVEL:-INFO}
+      NEXUS_DYNAMO_ENDPOINT: http://dynamodb:8000
+      NEXUS_DYNAMO_TABLE: ${NEXUS_DYNAMO_TABLE:-nexus-records}
+      NEXUS_AWS_REGION: us-east-1
+      # Fila local — ADR-004. Em volume nomeado, NAO em bind mount: SQLite em modo
+      # WAL depende de memoria compartilhada e locks POSIX que nao atravessam a
+      # fronteira host/VM no macOS. Todo acesso a fila acontece dentro do container.
+      NEXUS_QUEUE_BACKEND: ${NEXUS_QUEUE_BACKEND:-sqlite}
+      NEXUS_QUEUE_PATH: /data/nexus-queue.db
+      NEXUS_FAILURE_INJECTION_RATE: ${NEXUS_FAILURE_INJECTION_RATE:-0.0}
+      # Credenciais falsas exigidas pelo SDK para falar com o DynamoDB Local.
+      # Nao sao segredos — ver SECURITY.md.
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    ports:
+      - "8080:8080"
+    volumes:
+      - queue-data:/data
+    command:
+      - sh
+      - -c
+      - python -m nexus.persistence.tables && exec uvicorn nexus.ingestion.api:app --host 0.0.0.0 --port 8080
+
+volumes:
+  dynamodb-data:
+  queue-data:

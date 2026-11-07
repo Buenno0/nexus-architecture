@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Ambiente — NUNCA versionar segredos
+.env
+.env.local
+*.pem
+*.key
+.aws/
+
+# Dados locais
+*.db
+*.sqlite3
+data/
+.dynamodb/
+
+# Node (control-center, Fase 4)
+node_modules/
+dist/
+
+# Sistema
+.DS_Store

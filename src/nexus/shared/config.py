@@ -1,0 +1,106 @@
+"""Configuracao da plataforma.
+
+Toda configuracao vem de variaveis de ambiente com prefixo ``NEXUS_``. Nenhum valor
+operacional e embutido no codigo: trocar de ambiente nao deve exigir alteracao de fonte.
+
+``NEXUS_ENV`` e o unico ponto onde o ambiente e decidido. As fabricas de repositorio e
+de fila consultam esse valor; nenhum outro modulo deve ramificar por ambiente.
+"""
+
+from __future__ import annotations
+
+import socket
+from functools import lru_cache
+from typing import Literal
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+Environment = Literal["local", "aws"]
+QueueBackend = Literal["none", "sqlite"]
+
+
+class Settings(BaseSettings):
+    """Configuracao carregada do ambiente."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="NEXUS_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        frozen=True,
+    )
+
+    env: Environment = "local"
+    service_name: str = "nexus-ingestion"
+    log_level: str = "INFO"
+
+    # Persistencia
+    dynamo_table: str = "nexus-records"
+    dynamo_endpoint: str | None = Field(
+        default="http://localhost:8000",
+        description="Endpoint do DynamoDB Local. Deve ser None no ambiente AWS.",
+    )
+    aws_region: str = "us-east-1"
+
+    # Idempotencia — ADR-002
+    idempotency_ttl_seconds: int = Field(default=172_800, ge=60)
+
+    # Outbox — ADR-003
+    outbox_shards: int = Field(default=4, ge=1, le=64)
+    outbox_max_attempts: int = Field(default=5, ge=1, le=20)
+    outbox_backoff_base_seconds: float = Field(default=2.0, gt=0)
+    outbox_dispatch_batch_size: int = Field(default=25, ge=1, le=100)
+
+    # Fila — ADR-004
+    queue_backend: QueueBackend = "sqlite"
+    queue_path: str = "./data/nexus-queue.db"
+    queue_visibility_timeout_seconds: float = Field(default=30.0, gt=0)
+    queue_max_receive: int = Field(default=3, ge=1, le=20)
+    queue_retry_backoff_base_seconds: float = Field(default=2.0, gt=0)
+    queue_busy_timeout_seconds: float = Field(default=5.0, gt=0)
+
+    # Worker
+    worker_batch_size: int = Field(default=10, ge=1, le=100)
+    worker_id: str = Field(default_factory=lambda: f"worker-{socket.gethostname()}")
+    failure_injection_rate: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Fracao de processamentos que falham deliberadamente. Existe para exercitar "
+            "retentativa e DLQ sem adulterar os dados de entrada."
+        ),
+    )
+
+    # Limites de seguranca e custo
+    max_batch_records: int = Field(default=10_000, ge=1, le=100_000)
+    max_field_length: int = Field(default=512, ge=1)
+    max_page_size: int = Field(default=100, ge=1, le=1_000)
+
+    @field_validator("log_level")
+    @classmethod
+    def _valid_log_level(cls, value: str) -> str:
+        allowed = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
+        upper = value.upper()
+        if upper not in allowed:
+            raise ValueError(f"log_level invalido: {value!r}. Esperado um de {sorted(allowed)}")
+        return upper
+
+    @property
+    def is_aws(self) -> bool:
+        return self.env == "aws"
+
+    @property
+    def queue_enabled(self) -> bool:
+        return self.queue_backend != "none"
+
+
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    """Devolve a configuracao do processo.
+
+    Em cache: a configuracao e imutavel durante a vida do processo. Testes que precisem
+    de outra configuracao devem chamar ``get_settings.cache_clear()``.
+    """
+    return Settings()
