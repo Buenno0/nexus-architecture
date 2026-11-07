@@ -53,25 +53,40 @@ cp -R "${RAIZ}/src/nexus" "${CONSTRUCAO}/nexus"
 
 echo "==> Removendo o que nao precisa rodar na nuvem"
 
-# boto3 e botocore ja existem no ambiente do Lambda; levar copia propria so aumenta
-# o pacote e o cold start.
-rm -rf "${CONSTRUCAO}/boto3" "${CONSTRUCAO}/botocore"
-
-# O servidor Uvicorn e suas aceleracoes nao rodam na Lambda: o Mangum fala ASGI
-# diretamente com o FastAPI. uvloop sozinho pesa 16 MB, e cada megabyte do pacote
-# entra no tempo de cold start.
+# boto3 e botocore ja existem no ambiente do Lambda. O servidor Uvicorn e suas
+# aceleracoes nao rodam la: o Mangum fala ASGI direto com o FastAPI, e uvloop sozinho
+# pesa 16 MB — cada megabyte entra no tempo de cold start.
 #
 # Continuam instalados no ambiente local, onde o Docker de fato roda o Uvicorn.
-rm -rf \
-  "${CONSTRUCAO}/uvicorn" \
-  "${CONSTRUCAO}/uvloop" \
-  "${CONSTRUCAO}/httptools" \
-  "${CONSTRUCAO}/websockets" \
-  "${CONSTRUCAO}/watchfiles" \
-  "${CONSTRUCAO}/"*.dist-info
+DISPENSAVEIS=(boto3 botocore uvicorn uvloop httptools websockets watchfiles)
+
+for pacote in "${DISPENSAVEIS[@]}"; do
+  rm -rf "${CONSTRUCAO:?}/${pacote}"
+  # Remove SOMENTE o metadado do pacote removido.
+  #
+  # Apagar todos os *.dist-info de uma vez quebra a aplicacao em producao: o
+  # email-validator, que o Pydantic usa em EmailStr, consulta a propria versao via
+  # importlib.metadata. Sem o dist-info ele levanta
+  # "No package metadata was found for email-validator" no import, e a Lambda falha
+  # antes de atender a primeira requisicao.
+  rm -rf "${CONSTRUCAO:?}/${pacote}"-*.dist-info
+  rm -rf "${CONSTRUCAO:?}/${pacote//-/_}"-*.dist-info
+done
+
 find "${CONSTRUCAO}" -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
 find "${CONSTRUCAO}" -type d -name "tests" -prune -exec rm -rf {} + 2>/dev/null || true
 rm -f "${CONSTRUCAO}/requirements.txt"
+
+echo "==> Verificando metadados que a aplicacao consulta em runtime"
+# Pacotes que leem a propria versao com importlib.metadata. Sem dist-info, o import
+# falha — e so na nuvem.
+for obrigatorio in email_validator pydantic fastapi; do
+  if ! ls -d "${CONSTRUCAO}/${obrigatorio//_/-}"-*.dist-info >/dev/null 2>&1 \
+    && ! ls -d "${CONSTRUCAO}/${obrigatorio}"-*.dist-info >/dev/null 2>&1; then
+    echo "ERRO: faltou o metadado de ${obrigatorio}" >&2
+    exit 1
+  fi
+done
 
 echo "==> Compactando"
 (cd "${CONSTRUCAO}" && zip -qr "${PACOTE}" . -x '*.pyc')

@@ -11,17 +11,30 @@ Data: 2026-11-07 · Terraform 1.17.1 · moto 5.2.5 · Python 3.13.18
 | Cobertura global | 90% | **89%** |
 | Ruff / mypy strict | limpo | limpo |
 | `terraform validate` | — | **Success** |
-| Recursos AWS criados | 0 | **0** |
-| **Custo da fase** | US$ 0,00 | **US$ 0,00** |
+| Recursos AWS criados | 0 | **48 (implantado em 07/11)** |
+| **Custo estimado** | — | **~US$ 0,10/mes** |
 
 ## A entrega
 
-**Construido, nao implantado.** O deploy e um ato do dono da conta, com custo
-conhecido, descrito em [docs/runbook-deploy.md](../runbook-deploy.md).
+Construido e, apos autorizacao explicita, **implantado em 07/11/2026** na conta
+541099637415. 48 recursos, custo estimado de ~US$ 0,10/mes.
 
-A decisao nao foi so cautela: o perfil ativo nao tem permissao para nenhum dos
-servicos, e o unico perfil capaz usa AdministratorAccess com token SSO expirado desde
-08/10/2026.
+A hosted zone do Route 53 — unico custo fixo do projeto — **nao foi criada**.
+
+### Verificacao na AWS real
+
+| Verificacao | Resultado |
+|---|---|
+| `GET /health` | `200`, `persistence: ok`, `queue: enabled` |
+| Rota protegida sem token | `401` |
+| Ingestao sem token | `401` |
+| `/v1/ops/dispatch` sem token | `401` |
+| Rota protegida com token JWT | `200` |
+| Ingestao com token | `202`, `outbox_pending: 0` (publicacao inline funcionou) |
+| Consumo pelo worker | mensagens processadas, fila drenada |
+| **Resolucao de identidade** | **duas variantes agrupadas na mesma entidade** |
+| Cold start observado | ~2,2s (primeira invocacao) |
+| Invocacao quente | ~0,1s
 
 ## A bateria de contrato compartilhada
 
@@ -86,20 +99,82 @@ Diferencas legitimas ficam isoladas em testes especificos, nunca forcadas a coin
    redrive manual, que tem duas vantagens: devolve a **contagem exata** (igual a fila
    local) e roda inteiro nos testes. Em volume alto a API nativa seria preferivel.
 
-## O que **nao** foi verificado
+## O que o deploy real revelou
 
-**Nada rodou contra a AWS real.** Isso nao e detalhe:
+Escrevi antes que "`moto` simula a API, nao o servico" e que diferencas apareceriam no
+primeiro deploy. **Apareceram cinco**, nenhuma detectavel localmente:
 
-- `moto` simula a API do SQS, nao o servico — nao exercita latencia, limites de taxa,
-  consistencia eventual nem o comportamento real do `redrive_policy`.
-- Nenhuma politica IAM foi testada contra o avaliador real. Estao escopadas por
-  inspecao, nao por execucao.
-- O pacote Lambda nunca foi carregado por um runtime Lambda.
-- `terraform plan` exige credenciais validas; so `terraform validate` rodou.
-- Cold start nao foi medido — escopo da Fase 7.
+### 1. A franquia do DynamoDB provisionado e por conta, nao por recurso
 
-A primeira execucao de verdade e o passo 6 do runbook, e e la que diferencas entre
-simulacao e servico vao aparecer, se existirem.
+Recomendei PROVISIONED como alternativa de "custo zero". A franquia de 25 RCU/WCU vale
+**por conta, somando tabela e todos os indices**. Com 4 GSIs sao 5 componentes;
+provisionar 25 em cada daria 125/125, ou **US$ 56,94/mes** — 712x o custo do On-Demand.
+
+Pego ao inspecionar o plano do Terraform, **antes de aplicar**. A variavel virou um
+orcamento total, dividido automaticamente.
+
+### 2. O preco On-Demand estava desatualizado
+
+A API de precos da AWS informa **US$ 0,625 por milhao de WRU**, nao US$ 1,25. A
+estimativa caiu de US$ 0,15 para US$ 0,08 por 10.000 registros.
+
+### 3. A cota de concorrencia impede reservar
+
+A conta tem cota de **10 execucoes concorrentes no total**, e a AWS exige que sobrem 10
+nao reservadas. Qualquer `reserved_concurrent_executions` e recusado.
+
+A protecao nao desapareceu: a propria cota passa a ser o teto, e 10 simultaneas e mais
+apertado que qualquer reserva que definiriamos. A variavel aceita `-1` e explica isso.
+
+### 4. Remover `*.dist-info` quebrou a aplicacao em producao
+
+O script apagava todos os metadados para encolher o pacote. O `email-validator`, que o
+Pydantic usa em `EmailStr`, le a propria versao via `importlib.metadata`:
+
+```
+Runtime.ImportModuleError: Unable to import module 'nexus.handlers.api':
+No package metadata was found for email-validator
+```
+
+A Lambda falhava **no import**, antes de atender a primeira requisicao. Corrigido para
+remover apenas os metadados dos pacotes efetivamente removidos, com uma verificacao no
+build que falha se faltar metadado de pacote conhecido por precisar dele.
+
+### 5. `DescribeTable` faltava na policy
+
+`GET /health` chama `ping()`, que faz `DescribeTable`. A acao nao estava na policy: a
+API subia, respondia `200` e reportava `persistence: unavailable`. **Um health check
+mentindo sobre o proprio estado.**
+
+Faltava tambem `DeleteItem` na funcao `api` — confirmar uma revisao funde entidades, e
+a fusao apaga itens.
+
+`moto` nao avalia politicas IAM, entao nenhum teste local pegaria isso.
+
+### 6. Container quente mantem credenciais em cache
+
+Apos corrigir a policy, o simulador do IAM respondia `allowed` e a Lambda continuava
+recebendo `AccessDenied` — por mais de tres minutos. Containers quentes carregam
+credenciais em cache.
+
+Resolvido com uma variavel `NEXUS_BUILD` derivada do hash do pacote: muda a cada build
+e força containers novos no deploy.
+
+### 7. `ReceiveMessage` devolve menos do que o pedido
+
+Com 2 mensagens na fila e `MaxNumberOfMessages=10`, o SQS devolveu 1. E comportamento
+documentado — ele amostra um subconjunto dos servidores. A fila SQLite devolve sempre
+tudo que esta visivel.
+
+Nao e defeito: o worker e chamado repetidamente ate a fila esvaziar. Mas quem
+dimensionar lote contando com "pedi 10, recebo 10" vai errar.
+
+## O que ainda **nao** foi verificado
+
+- Comportamento sob carga: latencia, throttling, cold start no P99 — Fase 7.
+- `redrive_policy` movendo para a DLQ apos `maxReceiveCount` no SQS real.
+- Custo real: dados do Cost Explorer levam ate 24h para aparecer.
+- Nenhum registro DNS foi criado; a API responde pelo dominio da AWS.
 
 ## Custos
 

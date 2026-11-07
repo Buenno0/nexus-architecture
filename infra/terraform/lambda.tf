@@ -31,13 +31,23 @@ resource "aws_lambda_function" "this" {
   memory_size = var.lambda_memory_mb
   timeout     = var.lambda_timeout_seconds
 
-  # O freio principal contra fatura inesperada.
+  # -1 significa "sem reserva": a cota de concorrencia da conta passa a ser o teto.
+  # Ver a explicacao completa em variables.tf.
   reserved_concurrent_executions = var.lambda_reserved_concurrency
 
   environment {
     variables = merge(
       local.common_env,
-      { NEXUS_SERVICE_NAME = "${local.prefix}-${each.key}" },
+      {
+        NEXUS_SERVICE_NAME = "${local.prefix}-${each.key}"
+        # Identifica o pacote implantado. Muda a cada build novo, o que forca o Lambda
+        # a criar containers novos em vez de reaproveitar os quentes.
+        #
+        # Importa porque containers quentes carregam credenciais em cache: apos
+        # alterar uma policy IAM, eles podem continuar recebendo AccessDenied enquanto
+        # o simulador de politicas ja responde "allowed". Observado neste deploy.
+        NEXUS_BUILD = substr(filebase64sha256(var.lambda_zip_path), 0, 12)
+      },
     )
   }
 

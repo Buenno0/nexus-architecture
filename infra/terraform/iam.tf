@@ -48,8 +48,16 @@ data "aws_iam_policy_document" "api" {
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
+      # Confirmar uma revisao funde entidades, e a fusao apaga o item da entidade de
+      # origem e seus vinculos. Descoberto em deploy, nao em teste: o `moto` nao
+      # avalia politicas IAM.
+      "dynamodb:DeleteItem",
       "dynamodb:Query",
       "dynamodb:TransactWriteItems",
+      # GET /health chama ping(), que faz DescribeTable. Sem isso a API sobe e
+      # responde 200, mas com persistence="unavailable" — um health check que mente
+      # sobre o proprio estado.
+      "dynamodb:DescribeTable",
     ]
     resources = local.table_resources
   }

@@ -40,6 +40,10 @@ resource "aws_cognito_user_pool_client" "dashboard" {
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
+    # Fluxo iniciado por administrador: exige credenciais AWS com
+    # cognito-idp:AdminInitiateAuth para ser usado, alem da senha do usuario. Nao e
+    # superficie publica — serve para script de verificacao e automacao do operador.
+    "ALLOW_ADMIN_USER_PASSWORD_AUTH",
   ]
 
   access_token_validity  = 1

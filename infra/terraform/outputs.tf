@@ -35,6 +35,11 @@ output "safety_net_enabled" {
 }
 
 output "estimated_monthly_cost_usd" {
-  description = "Estimativa no volume previsto. Ver COSTS.md para a conta completa."
-  value       = "~0.70 (Route 53 0.50 fixo + DynamoDB On-Demand ~0.20 variavel)"
+  description = <<-EOT
+    Estimativa no volume previsto (~10.000 registros/mes). Ver COSTS.md.
+
+    Nenhum recurso aqui tem custo fixo: a hosted zone do Route 53, unico custo fixo do
+    projeto, NAO e criada por este Terraform.
+  EOT
+  value       = "~0.10 (DynamoDB On-Demand; demais servicos dentro da franquia)"
 }

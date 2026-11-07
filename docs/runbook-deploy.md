@@ -1,8 +1,10 @@
 # Runbook — Deploy na AWS
 
-Procedimento para implantar o Nexus Architecture. **Nada aqui foi executado**: a Fase 3
-entregou o codigo e a infraestrutura como codigo, e o deploy e um ato seu, com custo
-conhecido.
+Procedimento para implantar o Nexus Architecture.
+
+**Executado em 07/11/2026** na conta 541099637415, apos autorizacao explicita. 48
+recursos, custo estimado de ~US$ 0,10/mes. A hosted zone do Route 53 — unico custo fixo
+— nao foi criada.
 
 > **Antes de comecar, leia [COSTS.md](../COSTS.md).** O custo estimado e ~US$ 0,70/mes,
 > sendo US$ 0,50 fixos da hosted zone do Route 53. O restante acompanha o uso e cresce
@@ -168,21 +170,29 @@ Lambdas ja apagadas (expiram em 7 dias) e o historico do Cost Explorer.
 
 ## Solucao de problemas
 
-| Sintoma | Causa provavel |
-|---|---|
-| `AccessDenied` em Query no DynamoDB | Falta `${tabela}/index/*` na policy — consultar GSI exige permissao no ARN do indice |
-| `Unable to import module` na Lambda | Pacote com wheels do macOS; refaca `make lambda` |
-| `401` em toda rota, inclusive com token | `audience` do authorizer diferente do client ID |
-| Mensagens presas em voo | Worker caiu sem apagar; reaparecem apos o visibility timeout |
-| Fatura acima do esperado | Verifique volume no DynamoDB — e o unico custo linear relevante |
+Todos os casos abaixo foram encontrados no deploy real de 07/11/2026.
+
+| Sintoma | Causa | Correcao |
+|---|---|---|
+| `InvalidParameterValueException: decreases account's UnreservedConcurrentExecution below 10` | Cota da conta e de 10 execucoes concorrentes; a AWS exige 10 nao reservadas | `lambda_reserved_concurrency = -1`. A cota da conta vira o teto |
+| `Runtime.ImportModuleError: No package metadata was found for email-validator` | O build removia todos os `*.dist-info`; o Pydantic le a versao via `importlib.metadata` | Corrigido no `build_lambda.sh`, que agora verifica os metadados obrigatorios |
+| `/health` responde `200` com `persistence: unavailable` | Falta `dynamodb:DescribeTable` na policy — `ping()` usa | Adicionado ao `iam.tf` |
+| `AccessDenied` persiste apos corrigir a policy, com o simulador dizendo `allowed` | Container quente com credenciais em cache | `NEXUS_BUILD` derivado do hash do pacote força containers novos |
+| `AccessDenied` em Query no GSI | Falta `${tabela}/index/*` — consultar indice exige permissao no ARN do indice | Ja no `iam.tf` |
+| `process` devolve menos mensagens do que `max_messages` | `ReceiveMessage` do SQS amostra servidores e pode devolver menos | Normal. Chame ate `received: 0` |
+| Fatura acima do esperado | Volume no DynamoDB — unico custo linear | Veja a tabela em COSTS.md |
 
 ---
 
-## O que nao foi verificado
+## O que ainda nao foi verificado
 
-**Nada nesta fase rodou contra a AWS real.** `moto` simula a API do SQS, nao o servico:
-nao exercita latencia, limites de taxa, consistencia eventual nem o comportamento real
-do `redrive_policy`.
+O deploy de 07/11 validou saude, autenticacao, ingestao, consumo e resolucao de
+identidade. Continuam sem verificacao:
 
-A primeira execucao de verdade e a do passo 6 — e e la que diferencas entre simulacao e
-servico vao aparecer, se existirem.
+- comportamento sob carga: latencia, throttling e cold start no P99 (Fase 7);
+- `redrive_policy` movendo para a DLQ apos `maxReceiveCount` no SQS real;
+- custo real — o Cost Explorer leva ate 24h para refletir o uso;
+- dominio proprio: a API responde pelo endereco da AWS.
+
+As diferencas entre `moto` e o servico real estao catalogadas em
+[docs/testing/phase-3-report.md](testing/phase-3-report.md).

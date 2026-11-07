@@ -16,15 +16,16 @@ processados de forma assincrona, correlacionados e monitorados.
 |---|---|---|
 | Nexus Ingestion | 1 | Implementado |
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
-| Cloud Infrastructure | 3 | Implementado — **nao implantado**, custo US$ 0,00 |
+| Cloud Infrastructure | 3 | **Implantado na AWS** — ~US$ 0,10/mes |
 | Nexus Control Center | 4 | Nao iniciado |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Parcial (logging estruturado) |
 | Performance Engineering | 7 | Nao iniciado |
 
-Nenhum recurso de nuvem foi provisionado. O projeto roda inteiramente na maquina
-local. A Fase 3 entregou a infraestrutura como codigo pronta para aplicar — ver
-[docs/runbook-deploy.md](docs/runbook-deploy.md).
+A plataforma roda localmente em Docker **e** na AWS, implantada em 07/11/2026 na
+conta 541099637415 com 48 recursos e custo estimado de ~US$ 0,10/mes. A hosted zone do
+Route 53 — unico custo fixo — nao foi criada. Ver
+[docs/runbook-deploy.md](docs/runbook-deploy.md) e [COSTS.md](COSTS.md).
 
 ---
 
@@ -97,7 +98,7 @@ make reprocess && make drain && make resolution
 make reviews
 ```
 
-## AWS (Fase 3) — construida, nao implantada
+## AWS (Fase 3) — implantada
 
 ```bash
 make lambda
@@ -107,10 +108,14 @@ make lambda
 make tf-validate
 ```
 
-O deploy e um ato seu, com custo conhecido: siga
-[docs/runbook-deploy.md](docs/runbook-deploy.md). Estimativa de ~US$ 0,70/mes, dos
-quais US$ 0,50 sao a hosted zone do Route 53 — o unico custo fixo. Ver
-[COSTS.md](COSTS.md).
+Para destruir tudo:
+
+```bash
+cd infra/terraform && terraform destroy
+```
+
+Procedimento completo, incluindo criacao de operador no Cognito, em
+[docs/runbook-deploy.md](docs/runbook-deploy.md).
 
 ### Medir a qualidade da resolucao
 
@@ -195,8 +200,9 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **Nao ha interface de revisao**, apenas endpoints. A tela e escopo da Fase 4.
 - **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
   culpada, mas reverte-la e manual.
-- **Nada foi validado contra a AWS real.** `moto` simula a API do SQS, nao o servico:
-  nao exercita latencia, limites de taxa nem consistencia eventual.
+- **O comportamento sob carga na AWS nao foi medido** — latencia, throttling e cold
+  start no P99 sao escopo da Fase 7.
+- **Nenhum dominio proprio configurado**: a API responde pelo endereco da AWS.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.
 - **Metricas sao do processo**: zeram no reinicio e nao agregam entre replicas.

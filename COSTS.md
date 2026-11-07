@@ -19,15 +19,15 @@ Fases 1 e 2 permanecem integralmente locais.
 | API Gateway (HTTP API) | 1M req / mes (12 meses) | ~10k req | US$ 0 |
 | SQS | 1M req / mes (permanente) | ~50k req | US$ 0 |
 | DynamoDB armazenamento | 25 GB, permanente | < 1 GB | US$ 0 |
-| **DynamoDB escrita On-Demand** | **nenhuma** | ~120k WRU | **US$ 0,15** |
-| **DynamoDB leitura On-Demand** | **nenhuma** | ~200k RRU | **US$ 0,05** |
+| **DynamoDB escrita On-Demand** | **nenhuma** | ~120k WRU | **US$ 0,08** |
+| **DynamoDB leitura On-Demand** | **nenhuma** | ~200k RRU | **US$ 0,02** |
 | EventBridge Scheduler | nenhuma | 2.880 invocacoes | ~US$ 0,004 |
 | Cognito | 50.000 usuarios ativos/mes | 1-2 | US$ 0 |
 | CloudWatch Logs | 5 GB ingestao / mes | < 500 MB | US$ 0 |
 | Route 53 | nenhuma | 1 hosted zone | **US$ 0,50 / mes** |
 | ACM | gratuito para uso em servicos AWS | 1 certificado | US$ 0 |
 
-**Estimativa realista: ~US$ 0,70 por mes** no volume previsto de ~10.000 registros/mes.
+**Estimativa realista: ~US$ 0,10 por mes** no volume previsto de ~10.000 registros/mes.
 
 > **Correcao (2026-11-07).** A versao anterior desta tabela dizia
 > "DynamoDB On-Demand | 25 GB + 2,5M leituras | ~US$ 0". **Estava errado.** A franquia
@@ -35,30 +35,55 @@ Fases 1 e 2 permanecem integralmente locais.
 > ela **nao cobre requisicoes On-Demand**.
 >
 > Com ~12 WRU por registro (transacao de tres itens a 2x WRU cada, mais escritas nos
-> indices e nos itens de resolucao), 10.000 registros custam cerca de US$ 0,15 em
+> indices e nos itens de resolucao), 10.000 registros custam cerca de US$ 0,08 em
 > escrita. Pequeno, mas **nao zero — e linear no volume**, o que muda completamente a
 > conversa nos testes de carga da Fase 7.
+>
+> **Segunda correcao (07/11/2026, apos consultar a API de precos da AWS).** O preco de
+> escrita On-Demand em us-east-1 e **US$ 0,625 por milhao de WRU**, nao US$ 1,25 — a
+> AWS reduziu pela metade. A estimativa acima ja usa o valor verificado.
 
 ### Quanto custa um teste de carga
 
 | Registros | WRU aproximadas | Custo de escrita |
 |---|---|---|
-| 10.000 | 120.000 | US$ 0,15 |
-| 100.000 | 1.200.000 | US$ 1,50 |
-| 1.000.000 | 12.000.000 | **US$ 15,00** |
+| 10.000 | 120.000 | US$ 0,08 |
+| 100.000 | 1.200.000 | US$ 0,75 |
+| 1.000.000 | 12.000.000 | **US$ 7,50** |
 
 **Toda campanha de carga na AWS sera estimada e autorizada antes de rodar**, e o custo
 real registrado aqui depois.
 
-### Alternativa que elimina o custo variavel de escrita
+### A armadilha do modo provisionado
 
-DynamoDB **Provisionado** com 25 WCU e 25 RCU fica integralmente dentro da franquia
-permanente: US$ 0,00 em vez de ~US$ 0,20/mes.
+> **Correcao grave (07/11/2026).** Esta secao antes recomendava DynamoDB
+> **Provisionado** como alternativa de "custo zero", afirmando que 25 WCU/RCU ficariam
+> na franquia. **Estava errado, e caro.**
+>
+> A franquia de 25 RCU e 25 WCU e **POR CONTA, somando a tabela e TODOS os indices**.
+> Esta tabela tem 4 GSIs — sao 5 componentes. Provisionar 25 em cada daria 125/125,
+> ou seja **100 unidades acima da franquia**:
+>
+> | | Excedente | Preco/hora | Custo/mes |
+> |---|---|---|---|
+> | Escrita | 100 WCU | US$ 0,00065 | US$ 47,45 |
+> | Leitura | 100 RCU | US$ 0,00013 | US$ 9,49 |
+> | **Total** | | | **US$ 56,94** |
+>
+> Contra US$ 0,08 do On-Demand: **712 vezes mais caro**. Descoberto ao inspecionar o
+> plano do Terraform, antes de aplicar.
 
-Em troca, estrangula acima de 25 escritas por segundo, o que inviabilizaria os testes
-de carga. Por isso o Terraform expoe `dynamodb_billing_mode` como variavel: da para
-trocar para a demonstracao barata e voltar para On-Demand antes de medir desempenho,
-sem editar codigo.
+O Terraform foi corrigido: `dynamodb_provisioned_capacity` passou a ser um **orcamento
+total**, dividido automaticamente entre a tabela e os 4 GSIs. Com o padrao de 25, cada
+componente recebe 5 unidades — dentro da franquia, custo zero.
+
+Mas 5 WCU na tabela nao sustenta a plataforma: uma ingestao e `TransactWriteItems` com
+3 itens, custando 6 WCU. A taxa sustentada cai para ~0,8 registros/segundo, e os 500
+registros do gerador levariam ~10 minutos com throttling.
+
+**Conclusao: use On-Demand.** US$ 0,08 por mes e menos de um centavo por dia, e o modo
+provisionado so compensaria num volume em que a economia justificasse o estrangulamento
+— que nao e o caso deste projeto.
 
 O unico custo fixo garantido e a hosted zone do Route 53.
 
