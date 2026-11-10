@@ -254,3 +254,32 @@ class TestReprocessamento:
     def test_limite_aplicado(self, client: TestClient) -> None:
         assert client.post("/v1/ops/reprocess", json={"limit": 0}).status_code == 422
         assert client.post("/v1/ops/reprocess", json={"limit": 99999}).status_code == 422
+
+
+class TestDeclaracaoDeCapacidade:
+    """A API nao pode declarar errado o que ela faz — para mais nem para menos."""
+
+    def test_metrics_declara_resolucao_implementada(self, client: TestClient) -> None:
+        """Ficou fixo como 'not_implemented' da Fase 2 ate a Fase 4 revelar.
+
+        Anunciar capacidade inexistente e enganoso; negar a que existe tambem, e
+        esconde do operador uma parte da plataforma que esta funcionando.
+        """
+        corpo = client.get("/metrics").json()
+        assert corpo["modules"]["entity_resolution"] == "implemented"
+
+    def test_declara_nao_implementada_com_processador_simples(
+        self, repository: DynamoRecordRepository, queue: SqliteQueue, settings: Settings
+    ) -> None:
+        from nexus.queue.client import NullQueueClient
+
+        app.dependency_overrides[get_repository] = lambda: repository
+        app.dependency_overrides[get_queue_client] = lambda: NullQueueClient()
+        app.dependency_overrides[get_settings] = lambda: settings
+        try:
+            corpo = TestClient(app).get("/metrics").json()
+            # Sem fila, o motor aparece desligado; a resolucao continua disponivel
+            # porque depende do repositorio, nao da fila.
+            assert corpo["modules"]["queue_engine"] == "disabled"
+        finally:
+            app.dependency_overrides.clear()

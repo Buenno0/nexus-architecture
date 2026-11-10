@@ -78,13 +78,23 @@ autorizacao explicita.
 
 ---
 
-## Fase 4 — Nexus Control Center
+## Fase 4 — Nexus Control Center  *(concluida, exceto o deploy)*
 
-- [ ] React + TypeScript + Vite
-- [ ] Overview, API, Queue, Worker, Entity Resolution
-- [ ] Metricas reais; modulos ausentes exibem `—` com rotulo *not implemented*
-- [ ] Controles operacionais com limites rigidos
-- [ ] Deploy na Vercel
+- [x] React 19 + TypeScript strict + Vite
+- [x] Overview, API, Queue, Worker e Entity Resolution
+- [x] **Todo numero declara a origem**: persistido, processo ou sessao
+- [x] Metrica sem fonte aparece explicada, nunca inventada
+- [x] Carregando nunca e renderizado como vazio
+- [x] Falha mostra erro com `correlation_id`, nunca numero velho
+- [x] Controles operacionais com teto e confirmacao
+- [x] Gerador sintetico no navegador, com variantes realistas
+- [x] Fila de revisao com evidencia campo a campo
+- [x] CORS no backend, com recusa de `*`
+- [x] 96 testes, 80,5% de cobertura
+- [ ] Deploy na Vercel — depende de reaplicar a infraestrutura AWS
+
+Ver [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) e
+[ADR-009](docs/adr/ADR-009-control-center.md).
 
 ---
 

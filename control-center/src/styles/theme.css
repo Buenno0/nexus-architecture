@@ -1,0 +1,208 @@
+/*
+ * Tema do Control Center.
+ *
+ * Painel de engenharia, nao administracao generica: fundo escuro, densidade alta,
+ * monoespacada para todo numero. Sem framework de CSS — o tema e pequeno, especifico,
+ * e o projeto nao adiciona tecnologia por sofisticacao visual.
+ */
+
+:root {
+  /* Superficies, da mais funda para a mais alta */
+  --fundo: #0b0e14;
+  --superficie: #121722;
+  --superficie-alta: #1a2130;
+  --borda: #232c3d;
+  --borda-forte: #334157;
+
+  /* Texto */
+  --texto: #e4e9f2;
+  --texto-suave: #94a3b8;
+  --texto-fraco: #64748b;
+
+  /* Estados. Usados sempre com texto, nunca so a cor:
+     cor sozinha exclui quem nao a distingue. */
+  --ok: #34d399;
+  --atencao: #fbbf24;
+  --erro: #f87171;
+  --info: #60a5fa;
+  --neutro: #64748b;
+
+  /* Origem do dado — ver ADR-009 */
+  --origem-persistido: #34d399;
+  --origem-processo: #fbbf24;
+  --origem-sessao: #60a5fa;
+
+  /* Serie de graficos */
+  --serie-1: #60a5fa;
+  --serie-2: #34d399;
+  --serie-3: #fbbf24;
+  --serie-4: #f87171;
+  --serie-5: #a78bfa;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --raio: 6px;
+  --espaco: 8px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Todo numero e monoespacado e tabular: colunas alinham e o valor nao "pula"
+   enquanto atualiza. */
+.numero {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: var(--info);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--info);
+  outline-offset: 2px;
+}
+
+.grafico-vazio {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  border: 1px dashed var(--borda-forte);
+  border-radius: var(--raio);
+  color: var(--texto-fraco);
+  font-size: 12px;
+  text-align: center;
+  padding: 16px;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.tabela th {
+  text-align: left;
+  color: var(--texto-fraco);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--borda);
+}
+
+.tabela td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--borda);
+  color: var(--texto-suave);
+}
+
+.tabela tr:hover td {
+  background: var(--superficie);
+}
+
+.vazio {
+  color: var(--texto-fraco);
+  font-size: 12px;
+  padding: 12px;
+  text-align: center;
+}
+
+.progresso {
+  height: 6px;
+  background: var(--superficie-alta);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--borda);
+}
+
+.progresso__barra {
+  height: 100%;
+  background: var(--info);
+  transition: width 120ms linear;
+}
+
+.revisao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.revisao__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.revisao__score {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--atencao);
+  margin-right: 10px;
+}
+
+.revisao__motivo {
+  font-size: 12px;
+  color: var(--texto-fraco);
+}
+
+.revisao__acoes {
+  display: flex;
+  gap: 8px;
+}
+
+.revisao__ids {
+  font-size: 11px;
+  color: var(--texto-fraco);
+  margin-bottom: 8px;
+}
+
+.revisao__campo {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 10px;
+  background: var(--fundo);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.tabela--evidencia .celula-valor {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

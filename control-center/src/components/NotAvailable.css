@@ -1,0 +1,38 @@
+.indisponivel {
+  background: var(--superficie);
+  border: 1px dashed var(--borda-forte);
+  border-radius: var(--raio);
+  padding: 12px 14px;
+}
+
+.indisponivel__cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.indisponivel__rotulo {
+  color: var(--texto-suave);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.indisponivel__marca {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--neutro);
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.indisponivel__explicacao {
+  margin: 0;
+  font-size: 12px;
+  color: var(--texto-fraco);
+  line-height: 1.45;
+}

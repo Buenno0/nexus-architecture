@@ -1,0 +1,21 @@
+.origem {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid currentColor;
+  cursor: help;
+}
+
+.origem--persistido {
+  color: var(--origem-persistido);
+}
+.origem--processo {
+  color: var(--origem-processo);
+}
+.origem--sessao {
+  color: var(--origem-sessao);
+}

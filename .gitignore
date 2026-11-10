@@ -41,3 +41,9 @@ infra/terraform/.terraform.lock.hcl
 *.tfvars
 !*.tfvars.example
 crash.log
+
+# Control Center
+node_modules/
+control-center/dist/
+control-center/coverage/
+control-center/.env.local

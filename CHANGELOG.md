@@ -6,6 +6,25 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 4 — Nexus Control Center**
+
+- Dashboard em React 19 + TypeScript strict + Vite, com cinco telas: Overview, API,
+  Queue, Worker e Entity Resolution.
+- **Todo numero declara a origem** — `persistido`, `processo` ou `sessao` — porque as
+  tres tem garantias diferentes e misturar seria enganoso (ADR-009).
+- Metrica sem fonte real aparece explicada em vez de inventada; "workers em execucao"
+  diz que a execucao e sob demanda.
+- Series temporais acumuladas no navegador, com contador que diminui sendo descartado
+  em vez de virar taxa negativa.
+- Fila de revisao com evidencia campo a campo, confirmando ou recusando fusoes.
+- Controles operacionais com teto e confirmacao; gerador sintetico no navegador com
+  variantes realistas.
+- Autenticacao Cognito implementada e desativada por configuracao; token em memoria,
+  nunca em `localStorage`.
+- `CORSMiddleware` no backend, com recusa de `*` na propria configuracao.
+- 96 testes de frontend (80,5% de cobertura) e 13 de CORS no backend.
+- ADR-009 e `docs/testing/phase-4-report.md`.
+
 **Fase 3 — Cloud Infrastructure (construida, nao implantada)**
 
 - Adaptador `SqsQueue` implementando o mesmo `QueueClient` da fila local.
@@ -87,6 +106,19 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 - ADR-001 (DynamoDB Local), ADR-002 (identidade e idempotencia), ADR-003 (outbox).
 
 ### Corrigido
+
+**Fase 4**
+
+- **A API negava uma capacidade que tinha.** `/metrics` declarava
+  `entity_resolution: not_implemented`, fixo no codigo desde a Fase 2; a Fase 5
+  implementou a resolucao e nao atualizou o campo. Passou tres fases sem ser notado
+  porque ninguem le aquele campo num `curl` — bastou exibi-lo num card. Agora e
+  derivado do processador configurado, com teste de regressao.
+- **Carregando era renderizado como vazio.** A fila de revisao dizia "nenhum par
+  aguardando" enquanto o contador ao lado dizia 1. Um operador leria "nada a decidir"
+  e seguiria em frente.
+- **Bundle carregava o SDK do Cognito sem uso.** Importacao dinamica derrubou o bundle
+  inicial de 869 kB para 238 kB.
 
 **Fase 3**
 

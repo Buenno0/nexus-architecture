@@ -17,7 +17,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Nexus Ingestion | 1 | Implementado |
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
 | Cloud Infrastructure | 3 | Validado na AWS e **destruido** — custo real US$ 0,0001 |
-| Nexus Control Center | 4 | Nao iniciado |
+| Nexus Control Center | 4 | Implementado — 5 telas, roda local |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Parcial (logging estruturado) |
 | Performance Engineering | 7 | Nao iniciado |
@@ -77,6 +77,24 @@ make dispatch && make drain && make queue-stats
 
 ```bash
 make fail-test RATE=0.5
+```
+
+## Control Center (Fase 4)
+
+```bash
+make up && make dashboard
+```
+
+Abre em `http://localhost:5173`. Cinco telas: Overview, API, Queue, Worker e Entity
+Resolution.
+
+**Todo numero declara de onde veio** — `persistido` vem do armazenamento, `processo`
+zera no reinicio da API, `sessao` some ao recarregar a pagina. Metrica sem fonte real
+aparece explicada, nunca inventada. Ver
+[ADR-009](docs/adr/ADR-009-control-center.md).
+
+```bash
+make dashboard-check
 ```
 
 ## Entity Resolution (Fase 5)
@@ -182,6 +200,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - [docs/architecture/access-patterns.md](docs/architecture/access-patterns.md) — modelagem DynamoDB
 - [docs/testing/phase-1-report.md](docs/testing/phase-1-report.md) — testes da Fase 1
 - [docs/testing/phase-2-report.md](docs/testing/phase-2-report.md) — testes da Fase 2
+- [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) — testes da Fase 4
 - [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) — testes e qualidade da Fase 5
 - [docs/performance/](docs/performance/) — medicoes
 - [docs/adr/](docs/adr/) — registros de decisao arquitetural
@@ -193,6 +212,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-006](docs/adr/ADR-006-entity-resolution.md) — Blocking, pontuacao e clusterizacao
   - [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador
   - [ADR-008](docs/adr/ADR-008-arquitetura-serverless.md) — Arquitetura serverless na AWS
+  - [ADR-009](docs/adr/ADR-009-control-center.md) — Todo numero declara de onde veio
 - [docs/runbook-deploy.md](docs/runbook-deploy.md) — procedimento de deploy e destruicao
 
 ## Limitacoes conhecidas
@@ -209,7 +229,9 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   culpada, mas reverte-la e manual.
 - **O comportamento sob carga na AWS nao foi medido** — latencia, throttling e cold
   start no P99 sao escopo da Fase 7.
-- **Nenhum dominio proprio configurado**: a API responde pelo endereco da AWS.
+- **Nenhum dominio proprio configurado.**
+- **O historico do dashboard vive na aba**: recarregar zera as series.
+- **O dashboard nao foi publicado na Vercel**; roda local contra a API em Docker.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.
 - **Metricas sao do processo**: zeram no reinicio e nao agregam entre replicas.

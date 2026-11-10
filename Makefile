@@ -1,6 +1,7 @@
 .PHONY: help up down logs test test-unit test-int lint fmt generate table clean \
         dispatch process drain queue-stats redrive pipeline reprocess resolution \
-        reviews fail-test lambda tf-validate tf-plan
+        reviews fail-test lambda tf-validate tf-plan dashboard dashboard-build \
+        dashboard-test dashboard-check
 
 PY := .venv/bin/python
 N  ?= 100
@@ -33,6 +34,18 @@ process:   ## Consome um lote da fila
 
 drain:     ## Consome ate esvaziar a fila (ainda sob demanda, nao residente)
 	$(DC) python -m nexus.queue.worker --drain
+
+dashboard: ## Sobe o Control Center em modo de desenvolvimento (porta 5173)
+	cd control-center && npm run dev
+
+dashboard-build: ## Compila o Control Center para producao
+	cd control-center && npm run build
+
+dashboard-test: ## Testes do Control Center
+	cd control-center && npm run test
+
+dashboard-check: ## Tipos, lint e testes do Control Center
+	cd control-center && npx tsc --noEmit && npm run lint && npm run test
 
 lambda:    ## Empacota a aplicacao para o AWS Lambda
 	./scripts/build_lambda.sh

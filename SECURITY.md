@@ -83,6 +83,20 @@ escuta apenas em `localhost`.
 runbook registra isso como divida: o correto e uma role dedicada, limitada aos
 servicos do `iam.tf`.
 
+## Control Center
+
+| Controle | Implementacao |
+|---|---|
+| CORS | Origens explicitas; `*` recusado na propria configuracao |
+| Token | Em memoria, **nunca** em `localStorage` ou `sessionStorage` |
+| Credenciais | Sem cookies: `allow_credentials` desligado |
+| Operacoes caras | Teto e confirmacao explicita |
+| Dados | Gerador sintetico no navegador; nenhum dado pessoal real |
+
+Em `localStorage` o token sobreviveria ao fechamento da aba e ficaria legivel por
+qualquer script da pagina. O custo de manter em memoria e um login por recarga, e um
+teste garante que nada e escrito nos dois armazenamentos.
+
 ## Resolucao de identidade
 
 Fundir registros de pessoas distintas e, neste projeto, o erro de maior consequencia:

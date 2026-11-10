@@ -1,0 +1,45 @@
+.falha {
+  background: var(--superficie);
+  border: 1px solid var(--erro);
+  border-radius: var(--raio);
+  padding: 14px 16px;
+}
+
+.falha__titulo {
+  color: var(--erro);
+  font-weight: 600;
+  font-family: var(--mono);
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.falha__mensagem {
+  margin: 0 0 8px;
+  color: var(--texto);
+  font-size: 13px;
+}
+
+.falha__correlacao {
+  margin: 0;
+  color: var(--texto-fraco);
+  font-size: 12px;
+}
+
+.falha__correlacao code {
+  color: var(--texto-suave);
+}
+
+.falha__acao {
+  margin-top: 10px;
+  background: transparent;
+  color: var(--texto);
+  border: 1px solid var(--borda-forte);
+  border-radius: var(--raio);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.falha__acao:hover {
+  border-color: var(--info);
+  color: var(--info);
+}

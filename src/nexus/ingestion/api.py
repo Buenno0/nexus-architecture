@@ -13,6 +13,7 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Header, Path, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from nexus import __version__
@@ -149,6 +150,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.add_middleware(ObservabilityMiddleware)
+
+# O Control Center roda em outra origem (porta 5173 em desenvolvimento, dominio proprio
+# em producao), entao o navegador exige CORS. A lista de origens e explicita e o "*" e
+# recusado na configuracao: as rotas de /v1/ops disparam trabalho, e um curinga aqui
+# permitiria que qualquer pagina as chamasse pelo navegador de quem a visitasse.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=list(get_settings().cors_allowed_origins),
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["content-type", "authorization", "idempotency-key", "x-correlation-id"],
+    # A interface le os dois: o primeiro para rastrear, o segundo para distinguir
+    # replay de ingestao nova.
+    expose_headers=["x-correlation-id", "idempotency-replayed"],
+    allow_credentials=False,
+    max_age=300,
+)
 
 
 # -------------------------------------------------------------------- tratamento de erro
@@ -357,7 +374,9 @@ async def health(repository: RepositoryDep, queue: QueueDep) -> HealthOut:
 
 
 @app.get("/metrics", summary="Metricas operacionais", tags=["ops"])
-async def metrics(repository: RepositoryDep, queue: QueueDep) -> dict[str, Any]:
+async def metrics(
+    repository: RepositoryDep, queue: QueueDep, settings: SettingsDep
+) -> dict[str, Any]:
     """Metricas do processo.
 
     ``scope: in_process`` nao e decorativo: estes numeros zeram a cada reinicio e nao
@@ -389,10 +408,23 @@ async def metrics(repository: RepositoryDep, queue: QueueDep) -> dict[str, Any]:
         # sobrevive a reinicio e e consistente entre processos, ao contrario de
         # "counters" e "latency_ms" abaixo.
         "queue": queue_depth,
+        # Derivado do que esta de fato configurado, nunca fixo no codigo.
+        #
+        # Este dicionario tinha "entity_resolution": "not_implemented" escrito a mao
+        # desde a Fase 2. A Fase 5 implementou a resolucao e esqueceu de atualizar
+        # aqui, entao a API passou a declarar uma capacidade que ela tinha — o
+        # oposto do erro que a regra "nao anuncie o que nao existe" pretende evitar,
+        # e igualmente enganoso.
+        #
+        # O defeito so apareceu quando o Control Center mostrou o campo numa tela.
         "modules": {
             "ingestion": "implemented",
             "queue_engine": "implemented" if queue.is_enabled else "disabled",
-            "entity_resolution": "not_implemented",
+            "entity_resolution": (
+                "implemented"
+                if build_processor(settings, repository).version.startswith("resolution")
+                else "not_implemented"
+            ),
             "observability": "partial",
         },
         **snapshot,

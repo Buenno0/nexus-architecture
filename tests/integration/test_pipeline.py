@@ -258,7 +258,10 @@ class TestEndpointsDeOps:
 
         assert corpo["queue"]["pending"] == 1
         assert corpo["modules"]["queue_engine"] == "implemented"
-        assert corpo["modules"]["entity_resolution"] == "not_implemented"
+        # Era "not_implemented" fixo no codigo desde a Fase 2; a Fase 5
+        # implementou a resolucao e o campo so foi corrigido na Fase 4,
+        # quando o Control Center o exibiu numa tela.
+        assert corpo["modules"]["entity_resolution"] == "implemented"
 
     @pytest.mark.parametrize(
         ("rota", "corpo"),

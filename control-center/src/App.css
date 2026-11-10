@@ -1,0 +1,129 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.topo {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+  flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topo__marca {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.topo__nome {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--info);
+}
+
+.topo__sub {
+  font-size: 12px;
+  color: var(--texto-fraco);
+}
+
+.topo__nav {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.aba {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  color: var(--texto-suave);
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.aba:hover {
+  color: var(--texto);
+  background: var(--superficie-alta);
+}
+
+.aba--ativa {
+  color: var(--info);
+  border-color: var(--borda-forte);
+  background: var(--superficie-alta);
+}
+
+.topo__estado {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.estado {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--neutro);
+  color: var(--neutro);
+}
+
+.estado--ok {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+
+.estado--alerta {
+  color: var(--erro);
+  border-color: var(--erro);
+}
+
+.topo__ambiente {
+  font-size: 11px;
+  color: var(--texto-fraco);
+}
+
+.conteudo {
+  flex: 1;
+  padding: 20px;
+  max-width: 1500px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.rodape {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--borda);
+  color: var(--texto-fraco);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.rodape strong {
+  color: var(--texto-suave);
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .topo {
+    gap: 12px;
+  }
+  .conteudo {
+    padding: 14px;
+  }
+}

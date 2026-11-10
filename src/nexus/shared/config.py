@@ -102,6 +102,9 @@ class Settings(BaseSettings):
         }
     )
 
+    # Interface — Fase 4
+    cors_allowed_origins: tuple[str, ...] = ("http://localhost:5173",)
+
     # Limites de seguranca e custo
     max_batch_records: int = Field(default=10_000, ge=1, le=100_000)
     max_field_length: int = Field(default=512, ge=1)
@@ -123,6 +126,28 @@ class Settings(BaseSettings):
     @property
     def queue_enabled(self) -> bool:
         return self.queue_backend != "none"
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def _parse_origins(cls, value: object) -> object:
+        """Aceita lista separada por virgula vinda do ambiente."""
+        if isinstance(value, str):
+            return tuple(item.strip() for item in value.split(",") if item.strip())
+        return value
+
+    @model_validator(mode="after")
+    def _reject_wildcard_origin(self) -> Settings:
+        """Recusa "*" como origem permitida.
+
+        Com curinga, qualquer pagina da internet pode chamar a API do navegador de
+        quem a visita. As rotas operacionais disparam trabalho, entao isso nao e um
+        detalhe de configuracao — e uma porta aberta.
+        """
+        if "*" in self.cors_allowed_origins:
+            raise ValueError(
+                'cors_allowed_origins nao aceita "*": informe as origens explicitamente'
+            )
+        return self
 
     @model_validator(mode="after")
     def _sqs_requires_urls(self) -> Settings:
