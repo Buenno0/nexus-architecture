@@ -14,12 +14,14 @@ from typing import Any
 
 from nexus.ingestion.normalization import normalize_payload
 from nexus.observability.metrics import registry
+from nexus.observability.trail import TrailRecorder
 from nexus.persistence.models import (
     IdempotencyRecord,
     OutboxEvent,
     OutboxStatus,
     RecordType,
     StoredRecord,
+    TrailStage,
 )
 from nexus.persistence.repository import CommitConflictError, RecordRepository
 from nexus.queue.client import QueueClient, QueueMessage
@@ -49,10 +51,12 @@ class IngestionService:
         repository: RecordRepository,
         queue: QueueClient,
         settings: Settings | None = None,
+        trail: TrailRecorder | None = None,
     ) -> None:
         self._repo = repository
         self._queue = queue
         self._settings = settings or get_settings()
+        self._trail = trail or TrailRecorder(repository, "api")
 
     # ------------------------------------------------------------------ publico
 
@@ -227,6 +231,16 @@ class IngestionService:
             extra={"record_id": record_id, "event_id": event_id, "source": source},
         )
 
+        self._trail.marcar(
+            record_id,
+            TrailStage.ACCEPTED,
+            correlation_id=correlation_id,
+            source=source,
+            record_type=record_type.value,
+            fingerprint=fingerprint,
+            event_id=event_id,
+        )
+
         self._publish_best_effort(event)
         return IngestionResult(202, body)
 
@@ -256,6 +270,13 @@ class IngestionService:
 
         self._repo.mark_outbox_dispatched(event.event_id)
         registry.increment("outbox_dispatched_total")
+        self._trail.marcar(
+            event.record_id,
+            TrailStage.PUBLISHED,
+            correlation_id=event.correlation_id,
+            event_id=event.event_id,
+            via="inline",
+        )
 
     def _resolve_race(self, source: str, idempotency_key: str) -> IngestionResult:
         """Resolve corrida entre requisicoes concorrentes com a mesma chave.

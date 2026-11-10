@@ -22,6 +22,7 @@ from nexus.persistence.models import (
     EntityMember,
     IdempotencyRecord,
     MergeEvent,
+    MetricSample,
     OutboxEvent,
     OutboxStatus,
     Page,
@@ -31,6 +32,8 @@ from nexus.persistence.models import (
     ReviewItem,
     ReviewStatus,
     StoredRecord,
+    TrailEvent,
+    TrailStage,
 )
 from nexus.persistence.repository import CommitConflictError, RecordRepository
 from nexus.persistence.tables import (
@@ -49,7 +52,7 @@ from nexus.shared.errors import (
     PersistenceError,
     RecordNotFoundError,
 )
-from nexus.shared.identity import idempotency_scope
+from nexus.shared.identity import idempotency_scope, new_ulid
 from nexus.shared.logging import get_logger
 
 if TYPE_CHECKING:
@@ -196,6 +199,27 @@ def review_pk(pair_id: str) -> str:
     return f"REVIEW#{pair_id}"
 
 
+# ----------------------------------------------------------------- observabilidade
+
+
+def trail_pk(record_id: str) -> str:
+    return f"TRAIL#{record_id}"
+
+
+def trail_sk(occurred_at: datetime, event_id: str) -> str:
+    """Carimbo primeiro, identificador depois.
+
+    Assim a ``Query`` devolve os marcos ja em ordem cronologica, sem ordenar em
+    memoria. O identificador desempata marcos emitidos no mesmo milissegundo por
+    processos diferentes.
+    """
+    return f"{occurred_at.isoformat()}#{event_id}"
+
+
+def series_pk(metric: str) -> str:
+    return f"SERIES#{metric}"
+
+
 # ------------------------------------------------------------------------- cursores
 
 
@@ -300,6 +324,7 @@ def _processing_to_item(result: ProcessingResult) -> ItemDict:
         "worker_id": result.worker_id,
         "attempts": result.attempts,
         "duration_ms": result.duration_ms,
+        "end_to_end_ms": result.end_to_end_ms,
         "summary": result.summary,
         "correlation_id": result.correlation_id,
         "processed_at": result.processed_at.isoformat(),
@@ -318,6 +343,9 @@ def _item_to_processing(data: ItemDict) -> ProcessingResult:
         correlation_id=str(data.get("correlation_id", "")),
         processed_at=_parse_dt(data["processed_at"]),
         processor_version=str(data.get("processor_version", "pipeline-v1")),
+        end_to_end_ms=(
+            float(data["end_to_end_ms"]) if data.get("end_to_end_ms") is not None else None
+        ),
     )
 
 
@@ -1214,6 +1242,150 @@ class DynamoRecordRepository(RecordRepository):
         if decided is None:
             raise PersistenceError("Par de revisao desapareceu apos a decisao")
         return decided
+
+    # ----------------------------------------------------------- observabilidade
+
+    def record_trail(self, event: TrailEvent) -> bool:
+        """Grava um marco. Falha e engolida de proposito — ADR-010."""
+        event_id = event.event_id or new_ulid()
+        expira = utcnow() + timedelta(days=self._settings.trail_retention_days)
+        item = {
+            "pk": trail_pk(event.record_id),
+            "sk": trail_sk(event.occurred_at, event_id),
+            "entity": "trail",
+            "record_id": event.record_id,
+            "stage": event.stage.value,
+            "occurred_at": event.occurred_at.isoformat(),
+            "correlation_id": event.correlation_id,
+            "service": event.service,
+            "detail": event.detail,
+            "event_id": event_id,
+            "expires_at": int(expira.timestamp()),
+        }
+        try:
+            self._client.put_item(TableName=self._table, Item=_to_item(item))
+        except (ClientError, BotoCoreError) as exc:
+            # Nao propaga: a trilha explica falhas, nao as causa.
+            logger.warning(
+                "trail_write_failed",
+                extra={
+                    "record_id": event.record_id,
+                    "stage": event.stage.value,
+                    "reason": str(exc),
+                },
+            )
+            return False
+        return True
+
+    def get_trail(self, record_id: str) -> list[TrailEvent]:
+        eventos: list[TrailEvent] = []
+        start_key: ItemDict | None = None
+        while True:
+            kwargs: dict[str, Any] = {
+                "TableName": self._table,
+                "KeyConditionExpression": "pk = :pk",
+                "ExpressionAttributeValues": {":pk": {"S": trail_pk(record_id)}},
+            }
+            if start_key:
+                kwargs["ExclusiveStartKey"] = start_key
+            try:
+                response = self._client.query(**kwargs)
+            except (ClientError, BotoCoreError) as exc:
+                raise self._fail("get_trail", exc) from exc
+
+            for raw in response.get("Items") or []:
+                data = _from_item(raw)
+                eventos.append(
+                    TrailEvent(
+                        record_id=str(data["record_id"]),
+                        stage=TrailStage(data["stage"]),
+                        occurred_at=_parse_dt(data["occurred_at"]),
+                        correlation_id=str(data.get("correlation_id", "")),
+                        service=str(data.get("service", "")),
+                        detail=dict(data.get("detail") or {}),
+                        event_id=str(data.get("event_id", "")),
+                    )
+                )
+            start_key = response.get("LastEvaluatedKey")
+            if not start_key:
+                return eventos
+
+    def put_metric_sample(self, sample: MetricSample) -> bool:
+        item = {
+            "pk": series_pk(sample.metric),
+            "sk": sample.bucket.isoformat(),
+            "entity": "metric_sample",
+            "metric": sample.metric,
+            "bucket": sample.bucket.isoformat(),
+            "values": sample.values,
+            "expires_at": sample.expires_at,
+        }
+        try:
+            self._client.put_item(
+                TableName=self._table,
+                Item=_to_item(item),
+                # O balde ja ocupado significa que outro observador chegou primeiro
+                # neste intervalo. Nao e erro.
+                ConditionExpression="attribute_not_exists(pk)",
+            )
+        except self._client.exceptions.ConditionalCheckFailedException:
+            return False
+        except (ClientError, BotoCoreError) as exc:
+            logger.warning("metric_sample_failed", extra={"reason": str(exc)})
+            return False
+        return True
+
+    def get_metric_series(self, metric: str, *, since: datetime) -> list[MetricSample]:
+        try:
+            response = self._client.query(
+                TableName=self._table,
+                KeyConditionExpression="pk = :pk AND sk >= :desde",
+                ExpressionAttributeValues={
+                    ":pk": {"S": series_pk(metric)},
+                    ":desde": {"S": since.isoformat()},
+                },
+            )
+        except (ClientError, BotoCoreError) as exc:
+            raise self._fail("get_metric_series", exc) from exc
+
+        amostras: list[MetricSample] = []
+        for raw in response.get("Items") or []:
+            data = _from_item(raw)
+            amostras.append(
+                MetricSample(
+                    metric=str(data["metric"]),
+                    bucket=_parse_dt(data["bucket"]),
+                    values={k: float(v) for k, v in (data.get("values") or {}).items()},
+                    expires_at=_as_int(data.get("expires_at")),
+                )
+            )
+        return amostras
+
+    def oldest_pending_outbox_at(self) -> datetime | None:
+        """O evento pendente mais antigo entre todos os shards.
+
+        Backlog parado e um problema diferente de backlog grande: cem eventos
+        publicados ha um segundo sao normais; um evento parado ha uma hora nao.
+        """
+        mais_antigo: datetime | None = None
+        for shard_index in range(self._settings.outbox_shards):
+            try:
+                response = self._client.query(
+                    TableName=self._table,
+                    IndexName=GSI_OUTBOX_PENDING,
+                    KeyConditionExpression="pending_shard = :s",
+                    ExpressionAttributeValues={":s": {"S": f"PENDING#{shard_index}"}},
+                    Limit=1,
+                    ScanIndexForward=True,
+                )
+            except (ClientError, BotoCoreError) as exc:
+                logger.warning("oldest_pending_failed", extra={"reason": str(exc)})
+                continue
+            for raw in response.get("Items") or []:
+                quando = _parse_dt(_deserializer.deserialize(raw["next_attempt_at"]))
+                if mais_antigo is None or quando < mais_antigo:
+                    mais_antigo = quando
+        return mais_antigo
 
     # ------------------------------------------------ entity resolution: metricas
 

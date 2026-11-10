@@ -15,6 +15,8 @@ import sys
 from dataclasses import dataclass
 
 from nexus.observability.metrics import registry
+from nexus.observability.trail import TrailRecorder
+from nexus.persistence.models import TrailStage
 from nexus.persistence.repository import RecordRepository
 from nexus.queue.client import QueueClient, QueueMessage
 from nexus.shared.clock import utcnow
@@ -50,10 +52,12 @@ class OutboxDispatcher:
         repository: RecordRepository,
         queue: QueueClient,
         settings: Settings | None = None,
+        trail: TrailRecorder | None = None,
     ) -> None:
         self._repo = repository
         self._queue = queue
         self._settings = settings or get_settings()
+        self._trail = trail or TrailRecorder(repository, "dispatcher")
 
     def dispatch_once(self, *, limit: int | None = None) -> DispatchReport:
         """Publica ate ``limit`` eventos pendentes e devolve o relatorio."""
@@ -120,6 +124,14 @@ class OutboxDispatcher:
         # evento foi cumprido, e deixa-lo pendente faria o dispatcher tentar para
         # sempre um trabalho ja feito.
         self._repo.mark_outbox_dispatched(event_id)
+        self._trail.marcar(
+            event.record_id,
+            TrailStage.PUBLISHED,
+            correlation_id=event.correlation_id,
+            event_id=event_id,
+            via="dispatcher",
+            duplicate=None if published else True,
+        )
         return "dispatched" if published else "duplicate"
 
 

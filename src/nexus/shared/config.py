@@ -102,6 +102,18 @@ class Settings(BaseSettings):
         }
     )
 
+    # Observabilidade — Fase 6
+    trail_retention_days: int = Field(default=7, ge=1, le=90)
+    series_retention_days: int = Field(default=7, ge=1, le=90)
+    #: Intervalo do balde de amostragem. Define a densidade da serie.
+    series_interval_seconds: int = Field(default=15, ge=5, le=3600)
+    #: Backlog do outbox acima disso acende alerta.
+    alert_outbox_backlog: int = Field(default=50, ge=1)
+    #: Evento de outbox parado ha mais que isso acende alerta.
+    alert_outbox_age_minutes: int = Field(default=15, ge=1)
+    #: Taxa de erro HTTP acima disso acende alerta, em fracao.
+    alert_error_rate: float = Field(default=0.05, ge=0.0, le=1.0)
+
     # Interface — Fase 4
     cors_allowed_origins: tuple[str, ...] = ("http://localhost:5173",)
 

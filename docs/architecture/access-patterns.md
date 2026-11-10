@@ -31,6 +31,41 @@ O padrao 10 so funciona porque observacao e vinculo compartilham a mesma partica
 unica `Query` em `RECORD#<id>` devolve o registro **e** a entidade a que ele pertence.
 E exatamente o beneficio que a modelagem single-table existe para dar.
 
+## Consultas exigidas pela Fase 6
+
+| # | Padrao de acesso | Mecanismo | Custo |
+|---|---|---|---|
+| 13 | Reconstruir a jornada de uma observacao | `Query` com PK = `TRAIL#<record_id>` | O(marcos) |
+| 14 | Ler a serie temporal de uma metrica | `Query` com PK = `SERIES#<metrica>` | O(baldes na janela) |
+| 15 | Localizar o evento de outbox pendente mais antigo | `Query` em `gsi_outbox_pending`, limite 1 | O(1) |
+
+### Por que a trilha e chaveada por `record_id`, e nao por `correlation_id`
+
+Chavear por `correlation_id` pareceria natural: e ele que atravessa os processos. Mas a
+pergunta que se faz numa investigacao e *"o que aconteceu com este registro"*, e um
+registro reprocessado sob uma versao nova de processador tem **varios**
+`correlation_id` — um por passagem.
+
+Com `TRAIL#<record_id>`, uma unica `Query` devolve a jornada inteira, incluindo os
+reprocessamentos. O `correlation_id` vai como atributo de cada marco, para cruzar com
+os logs.
+
+Beneficio adicional: cabe na tabela base. Nenhum indice novo.
+
+### Por que o `SK` comeca pelo carimbo de tempo
+
+`SK = <carimbo ISO>#<ulid>` faz a `Query` devolver os marcos **ja em ordem
+cronologica**, sem ordenacao em memoria. O ULID no fim desempata marcos emitidos no
+mesmo milissegundo por processos diferentes.
+
+### Baldes na serie temporal
+
+`SK = <carimbo arredondado ao intervalo de amostragem>`. O arredondamento e o que
+permite escrita condicional: duas replicas da API, ou duas abas do dashboard, pedindo
+`/metrics` no mesmo intervalo tentam gravar **a mesma chave**, e so a primeira vence.
+Sem o balde, cada leitura viraria uma amostra e a serie teria densidade proporcional ao
+numero de observadores, nao ao tempo.
+
 ## Chaves da tabela base
 
 | Item | PK | SK | Fase |
@@ -45,6 +80,8 @@ E exatamente o beneficio que a modelagem single-table existe para dar.
 | Evento de fusao | `ENTITY#<entity_id>` | `MERGE#<ulid>` | 5 |
 | Vinculo reverso | `RECORD#<record_id>` | `ENTITY#<entity_id>` | 5 |
 | Par de revisao | `REVIEW#<pair_id>` | `REVIEW#<pair_id>` | 5 |
+| Marco da trilha | `TRAIL#<record_id>` | `<carimbo>#<ulid>` | 6 |
+| Amostra de metrica | `SERIES#<metrica>` | `<carimbo do balde>` | 6 |
 
 PK e SK iguais nos itens simples: todos sao acessados por identidade direta. A chave
 composta foi reservada desde a Fase 1 para itens filhos — e e ela que permite a Fase 5
@@ -120,11 +157,16 @@ o backlog, nao a tabela. Ver [ADR-003](../adr/ADR-003-transactional-outbox.md).
 
 ## TTL
 
-Atributo `expires_at` (epoch em segundos), aplicado apenas aos itens de idempotencia.
-Observacoes e eventos de outbox nunca expiram automaticamente.
+Atributo `expires_at` (epoch em segundos), aplicado a tres classes de item:
 
-Sem TTL, os registros de idempotencia cresceriam indefinidamente — eles sao a unica
-classe de item cujo valor e temporario por natureza.
+| Item | TTL | Por que expira |
+|---|---|---|
+| Idempotencia | 48h | Protege contra replay; depois disso nao ha replay a proteger |
+| Marco de trilha | 7 dias | Ajuda a investigar; investigacao de semanas atras usa outra fonte |
+| Amostra de metrica | 7 dias | Janela de observacao, nao historico permanente |
+
+Observacoes, eventos de outbox, entidades e resultados de processamento **nunca**
+expiram: sao dado, nao observacao sobre o dado.
 
 ## Blocking: por que nao reaproveitar `gsi_natural`
 

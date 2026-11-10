@@ -22,6 +22,21 @@ class ProcessingStatus(StrEnum):
     SUCCEEDED = "succeeded"
 
 
+class TrailStage(StrEnum):
+    """Marcos que mudam o estado de uma observacao — ADR-010.
+
+    Apenas marcos, nao todo evento. Retentativa e conflito de idempotencia aparecem
+    nos logs; aqui ficam os pontos em que o registro de fato avancou (ou parou).
+    """
+
+    ACCEPTED = "accepted"
+    PUBLISHED = "published"
+    CONSUMED = "consumed"
+    RESOLVED = "resolved"
+    FAILED = "failed"
+    DEAD_LETTERED = "dead_lettered"
+
+
 class ReviewStatus(StrEnum):
     PENDING = "pending"
     CONFIRMED = "confirmed"
@@ -123,6 +138,16 @@ class ProcessingResult:
     processor_version: str = "pipeline-v1"
     status: ProcessingStatus = ProcessingStatus.SUCCEEDED
 
+    #: Tempo entre a aceitacao da observacao e o fim do processamento.
+    #:
+    #: ``duration_ms`` mede so o processamento. A diferenca entre os dois e o tempo que
+    #: a mensagem passou parada na fila — e e ela que separa "o processamento esta
+    #: lento" de "a fila esta acumulando". Sao diagnosticos opostos, com correcoes
+    #: opostas, e ate aqui nenhum numero os distinguia.
+    #:
+    #: ``None`` quando a observacao nao traz ``created_at`` utilizavel.
+    end_to_end_ms: float | None = None
+
 
 # --------------------------------------------------------------- Entity Resolution
 
@@ -204,3 +229,43 @@ class ReviewItem:
     review_shard: str | None = None
     decided_at: datetime | None = None
     reason: str | None = None
+
+
+# ------------------------------------------------------------------ Observability
+
+
+@dataclass(frozen=True, slots=True)
+class TrailEvent:
+    """Um marco na jornada de uma observacao — ADR-010.
+
+    Chaveado por ``record_id``, nao por ``correlation_id``: a pergunta de uma
+    investigacao e "o que aconteceu com este registro", e um registro reprocessado tem
+    um ``correlation_id`` por passagem. O ``correlation_id`` vai como atributo, para
+    cruzar com os logs.
+
+    Escrito em best-effort: falhar aqui nao pode derrubar a operacao descrita.
+    """
+
+    record_id: str
+    stage: TrailStage
+    occurred_at: datetime
+    correlation_id: str
+    #: Processo que emitiu o marco: api, dispatcher ou worker.
+    service: str
+    detail: dict[str, Any] = field(default_factory=dict)
+    event_id: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MetricSample:
+    """Uma amostra de metricas num balde de tempo — ADR-010.
+
+    O carimbo e arredondado ao intervalo de amostragem. E isso que permite escrita
+    condicional: dois observadores no mesmo intervalo tentam gravar a mesma chave, e
+    so o primeiro vence.
+    """
+
+    metric: str
+    bucket: datetime
+    values: dict[str, float]
+    expires_at: int

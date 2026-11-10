@@ -18,6 +18,7 @@ from nexus.persistence.models import (
     EntityMember,
     IdempotencyRecord,
     MergeEvent,
+    MetricSample,
     OutboxEvent,
     Page,
     ProcessingResult,
@@ -25,6 +26,7 @@ from nexus.persistence.models import (
     ReviewItem,
     ReviewStatus,
     StoredRecord,
+    TrailEvent,
 )
 
 
@@ -252,3 +254,42 @@ class RecordRepository(ABC):
     @abstractmethod
     def get_resolution_stats(self) -> dict[str, int]:
         """Le os contadores duraveis de resolucao."""
+
+    # ------------------------------------------------------------ observabilidade
+
+    @abstractmethod
+    def record_trail(self, event: TrailEvent) -> bool:
+        """Grava um marco da jornada. **Best-effort** — ADR-010.
+
+        Devolve ``False`` quando a gravacao falha, e **nunca levanta**. Observabilidade
+        que derruba a operacao observada e pior que observabilidade nenhuma: trocaria
+        uma linha a menos numa investigacao por um registro perdido.
+        """
+
+    @abstractmethod
+    def get_trail(self, record_id: str) -> list[TrailEvent]:
+        """Jornada completa da observacao, em ordem cronologica.
+
+        A ordem vem da chave de ordenacao, nao de ordenacao em memoria.
+        """
+
+    @abstractmethod
+    def put_metric_sample(self, sample: MetricSample) -> bool:
+        """Grava uma amostra no balde. ``False`` se o balde ja estava ocupado.
+
+        Escrita condicional: dois observadores no mesmo intervalo gravam a mesma
+        chave, e so o primeiro vence. Sem isso, a densidade da serie acompanharia o
+        numero de observadores em vez do tempo.
+        """
+
+    @abstractmethod
+    def get_metric_series(self, metric: str, *, since: datetime) -> list[MetricSample]:
+        """Amostras da metrica a partir do instante informado."""
+
+    @abstractmethod
+    def oldest_pending_outbox_at(self) -> datetime | None:
+        """Instante do evento de outbox pendente mais antigo, se houver.
+
+        Backlog parado e diferente de backlog grande: o que importa e ha quanto tempo
+        o evento mais antigo espera.
+        """

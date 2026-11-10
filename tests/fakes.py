@@ -19,6 +19,7 @@ from nexus.persistence.models import (
     EntityMember,
     IdempotencyRecord,
     MergeEvent,
+    MetricSample,
     OutboxEvent,
     OutboxStatus,
     Page,
@@ -27,6 +28,7 @@ from nexus.persistence.models import (
     ReviewItem,
     ReviewStatus,
     StoredRecord,
+    TrailEvent,
 )
 from nexus.persistence.repository import CommitConflictError, RecordRepository
 from nexus.queue.client import FailOutcome, QueueClient, QueueMessage, QueueStats, ReceivedMessage
@@ -49,6 +51,11 @@ class FakeRepository(RecordRepository):
         self.record_links: dict[str, str] = {}
         self.reviews: dict[str, ReviewItem] = {}
         self.stats: dict[str, int] = {}
+        self.trail: dict[str, list[TrailEvent]] = {}
+        self.samples: dict[tuple[str, str], MetricSample] = {}
+        #: Quando True, toda escrita de trilha falha — para testar que ela nao derruba
+        #: a operacao que descreve.
+        self.trail_quebrada = False
         self._max_attempts = max_attempts
         # Zero por padrao: o reagendamento fica imediatamente visivel, tornando os
         # testes deterministicos sem sleep. O backoff real e exercitado contra o
@@ -349,6 +356,45 @@ class FakeRepository(RecordRepository):
     def get_resolution_stats(self) -> dict[str, int]:
         with self._lock:
             return dict(self.stats)
+
+
+    # ------------------------------------------------------------ observabilidade
+
+    def record_trail(self, event: TrailEvent) -> bool:
+        if self.trail_quebrada:
+            return False
+        with self._lock:
+            self.trail.setdefault(event.record_id, []).append(event)
+        return True
+
+    def get_trail(self, record_id: str) -> list[TrailEvent]:
+        with self._lock:
+            return sorted(self.trail.get(record_id, []), key=lambda e: e.occurred_at)
+
+    def put_metric_sample(self, sample: MetricSample) -> bool:
+        chave = (sample.metric, sample.bucket.isoformat())
+        with self._lock:
+            # Mesma condicao do repositorio real: balde ocupado nao e sobrescrito.
+            if chave in self.samples:
+                return False
+            self.samples[chave] = sample
+        return True
+
+    def get_metric_series(self, metric: str, *, since: datetime) -> list[MetricSample]:
+        with self._lock:
+            return sorted(
+                (s for s in self.samples.values() if s.metric == metric and s.bucket >= since),
+                key=lambda s: s.bucket,
+            )
+
+    def oldest_pending_outbox_at(self) -> datetime | None:
+        with self._lock:
+            pendentes = [
+                e.next_attempt_at
+                for e in self.events.values()
+                if e.status == OutboxStatus.PENDING
+            ]
+        return min(pendentes) if pendentes else None
 
 
 class RecordingQueueClient(QueueClient):

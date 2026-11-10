@@ -14,9 +14,11 @@ import argparse
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime
 
 from nexus.observability.metrics import registry
-from nexus.persistence.models import ProcessingResult
+from nexus.observability.trail import TrailRecorder
+from nexus.persistence.models import ProcessingResult, TrailStage
 from nexus.persistence.repository import CommitConflictError, RecordRepository
 from nexus.queue.client import QueueClient, ReceivedMessage
 from nexus.queue.processor import RecordProcessor, build_processor
@@ -55,11 +57,13 @@ class Worker:
         queue: QueueClient,
         processor: RecordProcessor | None = None,
         settings: Settings | None = None,
+        trail: TrailRecorder | None = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._repo = repository
         self._queue = queue
         self._processor = processor or build_processor(self._settings, repository)
+        self._trail = trail or TrailRecorder(repository, "worker")
 
     def process_once(self, *, max_messages: int | None = None) -> WorkerReport:
         """Consome um unico lote e termina."""
@@ -124,7 +128,23 @@ class Worker:
             logger.error("worker_record_missing", extra={"record_id": message.record_id})
             self._queue.dead_letter(message.receipt, error="registro inexistente")
             registry.increment("worker_dead_lettered_total")
+            self._trail.marcar(
+                message.record_id,
+                TrailStage.DEAD_LETTERED,
+                correlation_id=message.correlation_id,
+                reason="registro inexistente",
+                attempt=message.receive_count,
+            )
             return "dead_lettered"
+
+        self._trail.marcar(
+            record.record_id,
+            TrailStage.CONSUMED,
+            correlation_id=message.correlation_id,
+            attempt=message.receive_count,
+            processor_version=self._processor.version,
+            worker_id=self._settings.worker_id,
+        )
 
         started = time.perf_counter()
         try:
@@ -136,9 +156,19 @@ class Worker:
                 "worker_processing_failed",
                 extra={"record_id": message.record_id, "outcome": outcome.value},
             )
-            return "dead_lettered" if outcome.value == "dead_lettered" else "retried"
+            morreu = outcome.value == "dead_lettered"
+            self._trail.marcar(
+                record.record_id,
+                TrailStage.DEAD_LETTERED if morreu else TrailStage.FAILED,
+                correlation_id=message.correlation_id,
+                reason=str(exc),
+                attempt=message.receive_count,
+            )
+            return "dead_lettered" if morreu else "retried"
 
         duration_ms = (time.perf_counter() - started) * 1000
+        processed_at = utcnow()
+        end_to_end_ms = self._end_to_end_ms(record.created_at, processed_at)
         result = ProcessingResult(
             record_id=record.record_id,
             event_id=message.event_id,
@@ -147,8 +177,9 @@ class Worker:
             duration_ms=round(duration_ms, 3),
             summary=summary,
             correlation_id=message.correlation_id,
-            processed_at=utcnow(),
+            processed_at=processed_at,
             processor_version=self._processor.version,
+            end_to_end_ms=end_to_end_ms,
         )
 
         try:
@@ -162,11 +193,41 @@ class Worker:
 
         self._queue.delete(message.receipt)
         registry.observe("worker_record_duration", duration_ms)
+        if end_to_end_ms is not None:
+            registry.observe("record_end_to_end", end_to_end_ms)
+        self._trail.marcar(
+            record.record_id,
+            TrailStage.RESOLVED,
+            correlation_id=message.correlation_id,
+            duration_ms=round(duration_ms, 3),
+            end_to_end_ms=end_to_end_ms,
+            entity_id=summary.get("entity_id"),
+            decision=summary.get("decision"),
+            matches=summary.get("matches"),
+        )
         logger.info(
             "worker_record_processed",
-            extra={"record_id": record.record_id, "duration_ms": round(duration_ms, 3)},
+            extra={
+                "record_id": record.record_id,
+                "duration_ms": round(duration_ms, 3),
+                "end_to_end_ms": end_to_end_ms,
+            },
         )
         return "processed"
+
+    @staticmethod
+    def _end_to_end_ms(created_at: datetime | None, processed_at: datetime) -> float | None:
+        """Tempo entre a aceitacao e o fim do processamento.
+
+        Devolve ``None`` em vez de um numero negativo quando os relogios discordam.
+        Dois processos diferentes carimbam as duas pontas; na AWS sao duas Lambdas. Um
+        valor negativo nao e uma latencia pequena, e um sinal de que a medicao nao vale
+        — e gravar zero esconderia isso dentro de um histograma plausivel.
+        """
+        if created_at is None:
+            return None
+        delta = (processed_at - created_at).total_seconds() * 1000
+        return round(delta, 3) if delta >= 0 else None
 
 
 def main(argv: list[str] | None = None) -> int:
