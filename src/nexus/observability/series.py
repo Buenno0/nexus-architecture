@@ -76,11 +76,17 @@ class MetricSampler:
         segundos = int(moment.timestamp()) // intervalo * intervalo
         return datetime.fromtimestamp(segundos, tz=moment.tzinfo)
 
-    def sample(self, *, force: bool = False) -> SampleOutcome:
+    def sample(
+        self, *, force: bool = False, values: dict[str, float] | None = None
+    ) -> SampleOutcome:
         """Grava uma amostra do estado atual, se o balde ainda estiver livre.
 
         ``force`` ignora apenas a memoria local do processo, nunca a condicao de
         escrita: amostrar duas vezes no mesmo balde continua impossivel.
+
+        ``values`` aproveita leituras que quem chama ja fez. `/metrics` consulta o
+        backlog e a profundidade da fila para responder; reconsultar aqui dobraria o
+        custo da rota mais chamada do painel para obter os mesmos numeros.
         """
         agora = utcnow()
         balde = self.bucket_for(agora)
@@ -88,7 +94,7 @@ class MetricSampler:
         if not force and self._last_bucket == balde:
             return SampleOutcome(False, balde, {}, reason="balde ja amostrado por este processo")
 
-        valores = self._collect()
+        valores = values if values is not None else self._collect()
         if not valores:
             return SampleOutcome(False, balde, {}, reason="estado indisponivel")
 

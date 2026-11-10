@@ -10,7 +10,7 @@ estar enviando algo que o sistema ignoraria em silencio. Melhor recusar do que d
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -277,3 +277,83 @@ class ReprocessOut(BaseModel):
     scanned: int
     enqueued: int
     already_processed: int
+
+
+# -------------------------------------------------------------------- observability
+
+
+class TrailEventOut(BaseModel):
+    """Um marco na jornada de uma observacao — ADR-010."""
+
+    stage: str
+    occurred_at: datetime
+    correlation_id: str
+    service: str
+    detail: dict[str, object] = Field(default_factory=dict)
+
+    #: Tempo decorrido desde o marco anterior. ``None`` no primeiro.
+    #:
+    #: E aqui que o gargalo aparece. O total diz que o registro levou oito segundos;
+    #: o delta diz que sete deles foram entre `published` e `consumed`, ou seja,
+    #: espera na fila, e nenhuma otimizacao do processador os recuperaria.
+    delta_ms: float | None = None
+
+
+class TrailOut(BaseModel):
+    """Jornada completa de uma observacao."""
+
+    record_id: str
+    events: list[TrailEventOut]
+    total_ms: float | None = None
+    #: Processos que contribuiram com marcos. Varios nomes aqui sao a prova de que a
+    #: trilha atravessa fronteiras de processo, que e a razao de ela existir.
+    services: list[str] = Field(default_factory=list)
+
+
+class SeriesPointOut(BaseModel):
+    """Uma amostra da janela deslizante."""
+
+    bucket: datetime
+    values: dict[str, float] = Field(default_factory=dict)
+
+
+class SeriesOut(BaseModel):
+    """Serie persistida de profundidade da plataforma."""
+
+    metric: str
+    #: Sempre `persistido`: a serie vem do armazenamento, nao da memoria da aba.
+    origin: str
+    interval_seconds: int
+    window_minutes: int
+    points: list[SeriesPointOut] = Field(default_factory=list)
+    #: Baldes sem amostra dentro da janela. A amostragem e oportunista: sem ninguem
+    #: observando, nada e amostrado. O numero existe para a interface poder explicar o
+    #: buraco em vez de interpolar uma linha reta sobre um periodo nao medido.
+    gaps: int = 0
+
+
+class AlertOut(BaseModel):
+    """Uma condicao ativa, derivada do estado real."""
+
+    id: str
+    severity: str
+    title: str
+    detail: str
+    origin: str
+    value: float | None = None
+    threshold: float | None = None
+    context: dict[str, object] = Field(default_factory=dict)
+
+
+class AlertsOut(BaseModel):
+    alerts: list[AlertOut] = Field(default_factory=list)
+    evaluated_at: datetime
+
+
+class SampleOut(BaseModel):
+    """Resultado de uma tentativa de amostragem."""
+
+    written: bool
+    bucket: datetime
+    values: dict[str, float] = Field(default_factory=dict)
+    reason: str = ""

@@ -18,6 +18,8 @@ from fastapi.responses import JSONResponse
 
 from nexus import __version__
 from nexus.ingestion.schemas import (
+    AlertOut,
+    AlertsOut,
     DispatchOut,
     DispatchRequest,
     EntityMemberOut,
@@ -41,10 +43,17 @@ from nexus.ingestion.schemas import (
     ReviewDecisionRequest,
     ReviewOut,
     ReviewPage,
+    SampleOut,
+    SeriesOut,
+    SeriesPointOut,
+    TrailEventOut,
+    TrailOut,
 )
 from nexus.ingestion.service import IngestionResult, IngestionService
+from nexus.observability.alerts import AlertEvaluator
 from nexus.observability.metrics import registry
 from nexus.observability.middleware import ObservabilityMiddleware
+from nexus.observability.series import PLATFORM_SERIES, MetricSampler
 from nexus.persistence import get_repository
 from nexus.persistence.models import (
     Entity,
@@ -63,6 +72,7 @@ from nexus.queue.processor import build_processor
 from nexus.queue.reprocess import Reprocessor
 from nexus.queue.worker import Worker
 from nexus.resolution.clustering import ClusterManager
+from nexus.shared.clock import utcnow
 from nexus.shared.config import Settings, get_settings
 from nexus.shared.errors import MissingIdempotencyKeyError, NexusError, RecordNotFoundError
 from nexus.shared.logging import configure_logging, get_correlation_id, get_logger
@@ -400,9 +410,26 @@ async def metrics(
         logger.warning("queue_stats_unavailable")
         queue_depth = None
 
+    # Amostragem oportunista — ADR-010. Reaproveita as duas leituras acima: a rota
+    # mais chamada do painel paga, no maximo, uma escrita condicional por balde, e
+    # nenhuma leitura extra. Falhar aqui nao pode falhar /metrics.
+    sample_written = False
+    try:
+        valores: dict[str, float] = {}
+        if backlog is not None:
+            valores["outbox_pending"] = float(backlog)
+        if queue_depth is not None:
+            valores.update({f"queue_{k}": float(v) for k, v in queue_depth.items()})
+        if valores:
+            sampler = _get_sampler(repository, queue, settings)
+            sample_written = (await run_in_threadpool(sampler.sample, values=valores)).written
+    except Exception:
+        logger.warning("sample_failed")
+
     return {
         "scope": "in_process",
         "environment": get_settings().env,
+        "series_sampled": sample_written,
         "outbox_pending": backlog,
         # Profundidade da fila vem do armazenamento, nao de contadores em memoria:
         # sobrevive a reinicio e e consistente entre processos, ao contrario de
@@ -425,7 +452,7 @@ async def metrics(
                 if build_processor(settings, repository).version.startswith("resolution")
                 else "not_implemented"
             ),
-            "observability": "partial",
+            "observability": "implemented",
         },
         **snapshot,
     }
@@ -703,4 +730,177 @@ async def ops_reprocess(
         scanned=report.scanned,
         enqueued=report.enqueued,
         already_processed=report.already_processed,
+    )
+
+
+# ------------------------------------------------------------------ observability
+#
+# A trilha responde "o que aconteceu com este registro" atravessando os processos que
+# o tocaram. Ate a Fase 5 essa pergunta nao tinha resposta: o `correlation_id` era
+# propagado corretamente, mas a metade do worker so existia no terminal de quem rodou
+# o comando, e na Lambda nem isso haveria.
+#
+# Nada aqui e autenticado no ambiente local — ver SECURITY.md.
+
+
+# Um amostrador por processo: a memoria do ultimo balde so economiza leitura se
+# sobreviver entre requisicoes. Reconstruido quando o repositorio muda, o que acontece
+# nos testes que substituem a dependencia.
+_sampler: MetricSampler | None = None
+_sampler_repo: RecordRepository | None = None
+
+
+def _get_sampler(
+    repository: RecordRepository, queue: QueueClient, settings: Settings
+) -> MetricSampler:
+    global _sampler, _sampler_repo
+    if _sampler is None or _sampler_repo is not repository:
+        _sampler = MetricSampler(repository, queue, settings)
+        _sampler_repo = repository
+    return _sampler
+
+
+@app.get(
+    "/v1/observability/trail/{record_id}",
+    response_model=TrailOut,
+    summary="Jornada completa de uma observacao",
+    tags=["observability"],
+)
+async def observability_trail(
+    record_id: Annotated[str, Path(min_length=1, max_length=64)],
+    repository: RepositoryDep = None,  # type: ignore[assignment]
+) -> TrailOut:
+    """Reconstroi a jornada do registro, com o tempo entre marcos.
+
+    O delta e o que torna a trilha util. O total diz que o registro levou oito
+    segundos; o delta diz **onde** eles foram. Oito segundos entre `published` e
+    `consumed` sao espera na fila e nenhuma otimizacao do processador os recupera.
+
+    Trilha vazia nao e erro: ela e best-effort e tem TTL de sete dias. Um registro
+    antigo, ou um cujas escritas de trilha falharam, devolve a lista vazia — e dizer
+    "sem trilha" e mais honesto que um 404 sugerindo que o registro nao existe.
+    """
+    eventos = await run_in_threadpool(repository.get_trail, record_id)
+
+    saida: list[TrailEventOut] = []
+    anterior = None
+    for evento in eventos:
+        delta = None if anterior is None else (evento.occurred_at - anterior).total_seconds() * 1000
+        saida.append(
+            TrailEventOut(
+                stage=evento.stage.value,
+                occurred_at=evento.occurred_at,
+                correlation_id=evento.correlation_id,
+                service=evento.service,
+                detail=evento.detail,
+                delta_ms=None if delta is None else round(delta, 3),
+            )
+        )
+        anterior = evento.occurred_at
+
+    total = None
+    if len(eventos) > 1:
+        bruto = (eventos[-1].occurred_at - eventos[0].occurred_at).total_seconds() * 1000
+        total = round(bruto, 3)
+
+    return TrailOut(
+        record_id=record_id,
+        events=saida,
+        total_ms=total,
+        services=sorted({e.service for e in eventos}),
+    )
+
+
+@app.get(
+    "/v1/observability/series",
+    response_model=SeriesOut,
+    summary="Serie persistida de profundidade da plataforma",
+    tags=["observability"],
+)
+async def observability_series(
+    repository: RepositoryDep,
+    queue: QueueDep,
+    settings: SettingsDep,
+    window: Annotated[int, Query(ge=1, le=1440, description="Janela em minutos")] = 60,
+) -> SeriesOut:
+    """Devolve a serie gravada, nao contadores em memoria.
+
+    Ao contrario dos graficos da Fase 4, isto sobrevive a recarregar a pagina e a
+    reiniciar a API — era a limitacao que o ADR-009 registrou.
+    """
+    sampler = _get_sampler(repository, queue, settings)
+    amostras = await run_in_threadpool(sampler.read, window_minutes=window)
+
+    # Baldes esperados menos baldes medidos. A amostragem e oportunista: com a
+    # plataforma parada ninguem passa por /metrics e nada e gravado. A interface
+    # precisa do numero para explicar o buraco em vez de desenhar uma reta sobre ele.
+    esperados = max(1, (window * 60) // settings.series_interval_seconds)
+    return SeriesOut(
+        metric=PLATFORM_SERIES,
+        origin="persistido",
+        interval_seconds=settings.series_interval_seconds,
+        window_minutes=window,
+        points=[SeriesPointOut(bucket=a.bucket, values=a.values) for a in amostras],
+        gaps=max(0, esperados - len(amostras)),
+    )
+
+
+@app.get(
+    "/v1/observability/alerts",
+    response_model=AlertsOut,
+    summary="Condicoes ativas, derivadas do estado real",
+    tags=["observability"],
+)
+async def observability_alerts(
+    repository: RepositoryDep, queue: QueueDep, settings: SettingsDep
+) -> AlertsOut:
+    """Avalia as condicoes no instante da pergunta.
+
+    Nenhuma delas e configurada em outro lugar. Estado declarado envelhece em silencio
+    — foi assim que a API passou tres fases anunciando `entity_resolution:
+    not_implemented` depois que a Fase 5 a implementou.
+    """
+    avaliador = AlertEvaluator(repository, queue, settings)
+    ativos = await run_in_threadpool(avaliador.evaluate)
+    return AlertsOut(
+        alerts=[
+            AlertOut(
+                id=a.id,
+                severity=a.severity.value,
+                title=a.title,
+                detail=a.detail,
+                origin=a.origin.value,
+                value=a.value,
+                threshold=a.threshold,
+                context=a.context,
+            )
+            for a in ativos
+        ],
+        evaluated_at=utcnow(),
+    )
+
+
+@app.post(
+    "/v1/ops/sample",
+    response_model=SampleOut,
+    summary="Forca uma amostra da janela deslizante",
+    tags=["ops"],
+)
+async def ops_sample(
+    repository: RepositoryDep, queue: QueueDep, settings: SettingsDep
+) -> SampleOut:
+    """Amostra sob demanda, para o EventBridge Scheduler.
+
+    O Scheduler cobre a janela em que ninguem olha o painel. Usa ``force`` porque a
+    memoria local do processo nao vale para ele — numa Lambda fria ela esta sempre
+    vazia, e numa quente poderia pular a amostragem que o Scheduler existe para fazer.
+    A unicidade do balde continua garantida pela escrita condicional.
+    """
+    sampler = _get_sampler(repository, queue, settings)
+    resultado = await run_in_threadpool(sampler.sample, force=True)
+    return SampleOut(
+        written=resultado.written,
+        bucket=resultado.bucket,
+        values=resultado.values,
+        reason=resultado.reason,
     )
