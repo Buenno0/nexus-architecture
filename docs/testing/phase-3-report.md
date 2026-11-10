@@ -11,8 +11,8 @@ Data: 2026-11-07 · Terraform 1.17.1 · moto 5.2.5 · Python 3.13.18
 | Cobertura global | 90% | **89%** |
 | Ruff / mypy strict | limpo | limpo |
 | `terraform validate` | — | **Success** |
-| Recursos AWS criados | 0 | **48 (implantado em 07/11)** |
-| **Custo estimado** | — | **~US$ 0,10/mes** |
+| Recursos AWS criados | 0 | 40, implantados em 07/11 e **destruidos em 09/11** |
+| **Custo real medido** | — | **US$ 0,0001** |
 
 ## A entrega
 
@@ -160,7 +160,24 @@ credenciais em cache.
 Resolvido com uma variavel `NEXUS_BUILD` derivada do hash do pacote: muda a cada build
 e força containers novos no deploy.
 
-### 7. `ReceiveMessage` devolve menos do que o pedido
+### 7. O budget nunca teria disparado
+
+O `cost_filter` do AWS Budgets apontava para a tag `Project=nexus-architecture`. **Tags
+de alocacao de custo precisam ser ativadas explicitamente** no Billing; nenhuma estava
+na conta.
+
+O filtro nao casava com nada, entao o budget ficaria silencioso diante de qualquer
+valor — uma protecao de custo que existia so no papel.
+
+Descoberto ao medir o custo real na destruicao: a consulta filtrada por tag devolvia
+US$ 0,00, e o zero vinha do filtro vazio, nao da ausencia de gasto. **Quase reportei
+esse zero como resultado.**
+
+Corrigido com `aws_ce_cost_allocation_tag`, documentando que a ativacao leva ate 24h e
+nao reclassifica gasto anterior — razao a mais para manter o alerta por previsao, que
+nao depende de historico acumulado.
+
+### 8. `ReceiveMessage` devolve menos do que o pedido
 
 Com 2 mensagens na fila e `MaxNumberOfMessages=10`, o SQS devolveu 1. E comportamento
 documentado — ele amostra um subconjunto dos servidores. A fila SQLite devolve sempre
@@ -173,7 +190,7 @@ dimensionar lote contando com "pedi 10, recebo 10" vai errar.
 
 - Comportamento sob carga: latencia, throttling, cold start no P99 — Fase 7.
 - `redrive_policy` movendo para a DLQ apos `maxReceiveCount` no SQS real.
-- Custo real: dados do Cost Explorer levam ate 24h para aparecer.
+- `redrive_policy` movendo para a DLQ apos `maxReceiveCount` no SQS real.
 - Nenhum registro DNS foi criado; a API responde pelo dominio da AWS.
 
 ## Custos
@@ -198,3 +215,20 @@ estrangular acima de 25 escritas/segundo. Detalhamento em [COSTS.md](../../COSTS
   implementacao.
 - **Estado do Terraform e local.** Para trabalho em equipe, backend remoto com lock.
 - **Nenhum registro DNS gerenciado.** A alteracao e sua, com ACM validado antes.
+
+
+## Custo real e destruicao
+
+A infraestrutura ficou no ar de 07 a 09/11/2026 e foi destruida a pedido.
+
+| Servico | Custo nos 3 dias |
+|---|---|
+| Amazon DynamoDB | **US$ 0,0001** |
+| API Gateway, Lambda, SQS, Cognito, Scheduler, Logs | US$ 0,0000 (franquia) |
+
+Destruicao verificada em dez categorias — DynamoDB, Lambda, SQS, API Gateway, Cognito,
+Scheduler, IAM, Budgets, CloudWatch Logs e Route 53 — todas sem recurso remanescente, e
+estado do Terraform zerado.
+
+A estimativa de ~US$ 0,10/mes continua valida para o volume que ela assume (10.000
+registros/mes); a demonstracao usou um volume muito menor.
