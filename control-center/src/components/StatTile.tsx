@@ -40,6 +40,8 @@ export function StatTile({
 }: Props) {
   const vazio = valor === null || valor === undefined;
   const texto = carregando ? "…" : formatarValor(valor);
+  // Identificadores e nomes de backend nao cabem no corpo usado para numeros.
+  const longo = typeof valor === "string" && valor.length > 12;
 
   return (
     <div className={`tile tile--${estado}`} title={dica}>
@@ -47,7 +49,11 @@ export function StatTile({
         <span className="tile__rotulo">{rotulo}</span>
         <OriginBadge origem={origem} />
       </div>
-      <div className={`tile__valor numero ${vazio ? "tile__valor--vazio" : ""}`}>
+      <div
+        className={`tile__valor numero ${vazio ? "tile__valor--vazio" : ""} ${
+          longo ? "tile__valor--texto" : ""
+        }`}
+      >
         {texto}
         {!vazio && !carregando && unidade ? <span className="tile__unidade">{unidade}</span> : null}
       </div>

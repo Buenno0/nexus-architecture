@@ -19,15 +19,34 @@ import type { Series, SeriesPoint } from "../api/types";
 export function paraPontos(
   amostras: readonly SeriesPoint[],
   mapa: Record<string, string>,
+  intervaloSegundos?: number,
 ): Ponto[] {
-  return amostras.map((amostra) => {
-    const ponto: Ponto = { instante: new Date(amostra.bucket).getTime() };
+  const pontos: Ponto[] = [];
+  const passo = (intervaloSegundos ?? 0) * 1000;
+  let anterior: number | null = null;
+
+  for (const amostra of amostras) {
+    const instante = new Date(amostra.bucket).getTime();
+
+    // Balde ausente vira um ponto sem nenhuma serie. Com `connectNulls` desligado, a
+    // linha se parte ali — que e a representacao correta de um periodo nao medido.
+    // Sem isso, a janela sem amostra viraria um segmento reto entre dois instantes
+    // distantes, e o grafico afirmaria que o valor se manteve estavel durante um
+    // intervalo em que ninguem olhou.
+    if (passo > 0 && anterior !== null && instante - anterior > passo) {
+      pontos.push({ instante: anterior + passo });
+    }
+
+    const ponto: Ponto = { instante };
     for (const [gravado, rotulo] of Object.entries(mapa)) {
       const valor = amostra.values[gravado];
       if (valor !== undefined) ponto[rotulo] = valor;
     }
-    return ponto;
-  });
+    pontos.push(ponto);
+    anterior = instante;
+  }
+
+  return pontos;
 }
 
 /**

@@ -202,8 +202,11 @@ class Worker:
             duration_ms=round(duration_ms, 3),
             end_to_end_ms=end_to_end_ms,
             entity_id=summary.get("entity_id"),
-            decision=summary.get("decision"),
             matches=summary.get("matches"),
+            candidates=summary.get("candidates_compared"),
+            # `True` apenas; `None` e filtrado e nao polui a trilha dos casos normais.
+            # Truncar candidatos em silencio esconderia um possivel falso negativo.
+            truncated=summary.get("candidates_truncated") or None,
         )
         logger.info(
             "worker_record_processed",

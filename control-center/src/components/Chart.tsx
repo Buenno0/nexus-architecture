@@ -20,9 +20,17 @@ interface Props {
   altura?: number | undefined;
   /** Mensagem quando ainda nao ha pontos suficientes para uma linha. */
   vazio?: string | undefined;
+  /**
+   * Espaca os pontos pelo instante real, nao em passos iguais.
+   *
+   * Obrigatorio para a serie persistida: ela tem buracos, e um eixo categorico
+   * desenharia um intervalo de dez minutos com a mesma largura de um de quinze
+   * segundos — o grafico mentiria sobre quando cada leitura aconteceu.
+   */
+  eixoTemporal?: boolean | undefined;
 }
 
-export function Chart({ pontos, series, altura = 200, vazio }: Props) {
+export function Chart({ pontos, series, altura = 200, vazio, eixoTemporal = false }: Props) {
   if (pontos.length < 2) {
     return (
       <div className="grafico-vazio">
@@ -44,12 +52,27 @@ export function Chart({ pontos, series, altura = 200, vazio }: Props) {
       <ResponsiveContainer>
         <LineChart data={dados} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
           <CartesianGrid stroke="var(--borda)" strokeDasharray="2 4" />
-          <XAxis
-            dataKey="hora"
-            stroke="var(--texto-fraco)"
-            tick={{ fontSize: 10, fontFamily: "var(--mono)" }}
-            minTickGap={40}
-          />
+          {eixoTemporal ? (
+            <XAxis
+              dataKey="instante"
+              type="number"
+              scale="time"
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={(v: number) =>
+                new Date(v).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+              }
+              stroke="var(--texto-fraco)"
+              tick={{ fontSize: 10, fontFamily: "var(--mono)" }}
+              minTickGap={40}
+            />
+          ) : (
+            <XAxis
+              dataKey="hora"
+              stroke="var(--texto-fraco)"
+              tick={{ fontSize: 10, fontFamily: "var(--mono)" }}
+              minTickGap={40}
+            />
+          )}
           <YAxis
             stroke="var(--texto-fraco)"
             tick={{ fontSize: 10, fontFamily: "var(--mono)" }}
@@ -64,6 +87,12 @@ export function Chart({ pontos, series, altura = 200, vazio }: Props) {
               fontSize: 12,
             }}
             labelStyle={{ color: "var(--texto-suave)" }}
+            {...(eixoTemporal
+              ? {
+                  labelFormatter: (v: number) =>
+                    new Date(v).toLocaleTimeString("pt-BR"),
+                }
+              : {})}
           />
           {series.map((serie, i) => (
             <Line
@@ -74,6 +103,9 @@ export function Chart({ pontos, series, altura = 200, vazio }: Props) {
               stroke={CORES[i % CORES.length]}
               strokeWidth={1.8}
               dot={false}
+              // Buraco na serie parte a linha. Interpolar sobre um periodo nao medido
+              // produziria um grafico mais bonito e falso.
+              connectNulls={false}
               isAnimationActive={false}
             />
           ))}

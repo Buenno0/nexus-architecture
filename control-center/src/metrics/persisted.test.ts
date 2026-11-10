@@ -62,3 +62,49 @@ describe("descreverCobertura", () => {
     expect(texto).not.toMatch(/nao foram medidos/);
   });
 });
+
+describe("buracos na serie", () => {
+  const mapa = { queue_pending: "aguardando" };
+
+  it("insere um ponto vazio onde faltou balde", () => {
+    /* Sem isso, dez minutos sem medicao virariam um segmento reto entre dois
+       instantes distantes, e o grafico afirmaria estabilidade onde houve cegueira. */
+    const pontos = paraPontos(
+      [
+        { bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 3 } },
+        { bucket: "2026-11-10T12:10:00+00:00", values: { queue_pending: 9 } },
+      ],
+      mapa,
+      15,
+    );
+
+    expect(pontos).toHaveLength(3);
+    expect(pontos[1]?.aguardando).toBeUndefined();
+    expect(pontos[1]?.instante).toBe(Date.parse("2026-11-10T12:00:15+00:00"));
+  });
+
+  it("baldes consecutivos nao ganham ponto vazio", () => {
+    const pontos = paraPontos(
+      [
+        { bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 3 } },
+        { bucket: "2026-11-10T12:00:15+00:00", values: { queue_pending: 4 } },
+      ],
+      mapa,
+      15,
+    );
+
+    expect(pontos).toHaveLength(2);
+  });
+
+  it("sem intervalo informado nao inventa buracos", () => {
+    const pontos = paraPontos(
+      [
+        { bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 3 } },
+        { bucket: "2026-11-10T12:10:00+00:00", values: { queue_pending: 9 } },
+      ],
+      mapa,
+    );
+
+    expect(pontos).toHaveLength(2);
+  });
+});

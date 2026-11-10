@@ -41,12 +41,16 @@ export function QueueMonitoring() {
   const [progresso, setProgresso] = useState<ProgressoGeracao | null>(null);
 
   const serie = usePersistedSeries(60);
-  const pontos = paraPontos(serie.data?.points ?? [], {
-    queue_pending: "aguardando",
-    queue_in_flight: "em voo",
-    queue_dead: "dead letter",
-    outbox_pending: "outbox",
-  });
+  const pontos = paraPontos(
+    serie.data?.points ?? [],
+    {
+      queue_pending: "aguardando",
+      queue_in_flight: "em voo",
+      queue_dead: "dead letter",
+      outbox_pending: "outbox",
+    },
+    serie.data?.interval_seconds,
+  );
 
   if (queue.isError) {
     return <ErrorState erro={queue.error} onTentarNovamente={() => void queue.refetch()} />;
@@ -184,6 +188,7 @@ export function QueueMonitoring() {
             { chave: "outbox", rotulo: "outbox" },
           ]}
           altura={240}
+          eixoTemporal
           vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
         />
       </Panel>

@@ -27,12 +27,16 @@ export function Overview() {
   // Serie do armazenamento, nao da memoria desta aba: sobrevive a recarregar a pagina
   // e a reiniciar a API. Era a limitacao que o ADR-009 registrou e a Fase 6 fechou.
   const serie = usePersistedSeries(60);
-  const pontos = paraPontos(serie.data?.points ?? [], {
-    queue_pending: "aguardando",
-    queue_in_flight: "em voo",
-    queue_dead: "dead letter",
-    outbox_pending: "outbox",
-  });
+  const pontos = paraPontos(
+    serie.data?.points ?? [],
+    {
+      queue_pending: "aguardando",
+      queue_in_flight: "em voo",
+      queue_dead: "dead letter",
+      outbox_pending: "outbox",
+    },
+    serie.data?.interval_seconds,
+  );
 
   if (metrics.isError) return <ErrorState erro={metrics.error} onTentarNovamente={() => void metrics.refetch()} />;
 
@@ -146,6 +150,7 @@ export function Overview() {
             { chave: "dead letter", rotulo: "dead letter" },
             { chave: "outbox", rotulo: "outbox" },
           ]}
+          eixoTemporal
           vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
         />
       </Panel>
