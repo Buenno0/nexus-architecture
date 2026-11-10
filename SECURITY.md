@@ -45,8 +45,15 @@ Fase 3 em diante:
 
 ## Endpoints operacionais
 
-As rotas `/v1/ops/*` disparam trabalho: publicam eventos, consomem a fila e devolvem
-mensagens da DLQ. **Nao ha autenticacao nelas.**
+As rotas `/v1/ops/*` disparam trabalho: publicam eventos, consomem a fila, devolvem
+mensagens da DLQ e, desde a Fase 6, gravam amostras da janela deslizante
+(`POST /v1/ops/sample`). **Nao ha autenticacao nelas.**
+
+As rotas `/v1/observability/*` sao de leitura, mas **expoem a jornada interna de um
+registro**: quais processos o tocaram, quando, com que `correlation_id` e por que
+falhou. Nao ha dado pessoal ali — os detalhes sao identificadores, carimbos e motivos —
+mas e informacao operacional que nao deve ficar publica. Elas entram no mesmo
+authorizer JWT que protege o resto, exceto `/health`.
 
 Mitigacoes atuais:
 

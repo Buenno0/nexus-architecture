@@ -263,6 +263,46 @@ de custo depende disso.
 
 ---
 
+## Observabilidade (ADR-010)
+
+A jornada de uma observacao e reconstruida a partir de itens na tabela base:
+
+```
+PK = TRAIL#<record_id>    SK = <iso_timestamp>#<ulid>
+```
+
+```
+  API                                         worker
+   |                                            |
+   |-- accepted ------------------------------->|  TRAIL#<record_id>
+   |-- published ------------------------------>|
+   |                                            |-- consumed -------->
+   |                                            |-- resolved -------->
+   |                                            |   (ou failed / dead_lettered)
+```
+
+Tres propriedades sustentam o desenho:
+
+1. **Chaveada por registro, nao por `correlation_id`.** Cabe na tabela base sem indice
+   novo, e um registro reprocessado sob versao nova de processador tem varios
+   `correlation_id` — perguntar "o que aconteceu com este registro" deve trazer todos.
+2. **`SK` comecando pelo carimbo.** A `Query` ja devolve em ordem cronologica; o ULID
+   desempata o mesmo milissegundo.
+3. **Best-effort, sempre.** Falha de gravacao e engolida. Um registro perdido e dado
+   perdido; um evento de trilha perdido e uma linha a menos numa investigacao.
+   Observabilidade que derruba o que observa e pior que nenhuma.
+
+`duration_ms` mede o processamento; `end_to_end_ms` mede da aceitacao ao fim. **A
+diferenca entre os dois e a espera na fila** — e e ela que separa "o processamento esta
+lento" de "a fila esta acumulando", diagnosticos opostos com correcoes opostas.
+
+A janela deslizante vive em `SERIES#<metrica>` com o carimbo arredondado ao balde. O
+arredondamento e proposital: faz observadores concorrentes colidirem na mesma chave,
+onde a escrita condicional deixa passar um. Sem ele, a densidade da serie mediria o
+numero de observadores em vez do tempo.
+
+---
+
 ## Fronteiras dos modulos
 
 | Modulo | Responsabilidade | Nao faz |
@@ -270,7 +310,7 @@ de custo depende disso.
 | Ingestion | HTTP, validacao, normalizacao, idempotencia, transacao, publicacao | Nao compara entidades, nao decide duplicidade |
 | Queue Engine | Consumo, lotes, retry, backoff, DLQ, dispatcher de outbox | Nao conhece regra de negocio — o processador e injetado |
 | Entity Resolution | Blocking, comparacao, score, decisao, clusters | Nao acessa fila nem HTTP; e invocado como processador |
-| Observability | correlation_id, logs JSON, metricas | Nao e processo separado — e camada transversal |
+| Observability | correlation_id, logs JSON, metricas, trilha durável, serie e alertas | Nao e processo separado — e camada transversal. Nao e auditoria: toda escrita e best-effort |
 | Control Center | Visualizacao e operacao | Nenhuma logica de negocio |
 
 ## Comunicacao entre modulos
@@ -321,3 +361,6 @@ Ver [ADR-001](docs/adr/ADR-001-dynamodb-local.md).
 - [ADR-005](docs/adr/ADR-005-idempotencia-no-consumo.md) — Marcador e resultado como um unico item
 - [ADR-006](docs/adr/ADR-006-entity-resolution.md) — Blocking, pontuacao e clusterizacao auditavel
 - [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador
+- [ADR-008](docs/adr/ADR-008-arquitetura-serverless.md) — Arquitetura serverless na AWS
+- [ADR-009](docs/adr/ADR-009-control-center.md) — Todo numero declara de onde veio
+- [ADR-010](docs/adr/ADR-010-observabilidade.md) — Trilha durável, best-effort, por registro

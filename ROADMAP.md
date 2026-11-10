@@ -98,26 +98,49 @@ Ver [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) e
 
 ---
 
-## Fase 5 — Nexus Entity Resolution
+## Fase 5 — Nexus Entity Resolution  *(concluida)*
 
-- [ ] Blocking para selecao de candidatos
-- [ ] Comparadores: exato, Jaro-Winkler, Levenshtein, email, documento
-- [ ] Normalizacao de nomes
-- [ ] Score ponderado e configuravel
-- [ ] Decisao em tres faixas: MATCH / POSSIBLE_MATCH / NO_MATCH
-- [ ] `POSSIBLE_MATCH` nunca funde automaticamente
-- [ ] Score detalhado persistido para auditoria
-- [ ] Analise de falsos positivos e negativos
+- [x] Blocking para selecao de candidatos
+- [x] Comparadores: exato, Jaro-Winkler, Levenshtein, email, documento
+- [x] Normalizacao de nomes
+- [x] Score ponderado e configuravel
+- [x] Decisao em tres faixas: MATCH / POSSIBLE_MATCH / NO_MATCH
+- [x] `POSSIBLE_MATCH` nunca funde automaticamente
+- [x] Score detalhado persistido para auditoria
+- [x] Analise de falsos positivos e negativos
+
+Recall 1,0000 e precisao mantida apos o ajuste de `token_set_ratio`. Ver
+[docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) e
+[ADR-006](docs/adr/ADR-006-entity-resolution.md).
+
+> Esta secao ficou marcada como pendente ate a Fase 6, mesmo com a fase concluida antes
+> da Fase 3. Mais um caso do que o ADR-010 chama de estado declarado envelhecendo em
+> silencio — e o segundo no mesmo arquivo, depois da Fase 3.
 
 ---
 
-## Fase 6 — Nexus Observability
+## Fase 6 — Nexus Observability  *(concluida)*
 
-- [ ] Rastreamento fim a fim por `correlation_id`
-- [ ] Metricas de throughput, latencia e falhas
-- [ ] Histograma com P50, P95, P99
-- [ ] Identificacao de gargalos
-- [ ] Historico de execucao
+- [x] Rastreamento fim a fim **atravessando processos**, por `record_id`
+- [x] Seis marcos duraveis com TTL de 7 dias, sem indice novo
+- [x] Metricas de throughput, latencia e falhas
+- [x] Histograma com P50, P95, P99
+- [x] `end_to_end_ms`: separa processamento lento de fila acumulando
+- [x] Historico de execucao **persistido**, sobrevive a recarregar e a reiniciar
+- [x] Seis alertas derivados do estado real, nunca configurados a mao
+- [x] Tela Trail, faixa de alertas e graficos persistidos no Control Center
+- [x] Toda escrita de observabilidade e best-effort e nunca derruba o observado
+- [x] 546 testes Python (92% em `observability`), 115 no dashboard
+- [ ] Amostragem pelo EventBridge Scheduler validada na nuvem — depende da Fase 3
+- [ ] Impacto das escritas de trilha sob carga — Fase 7
+
+A verificacao achou seis defeitos, entre eles um numero que eu havia publicado no
+relatorio da Fase 4 sem verificar e um grafico que desmentia a propria legenda. Ver
+[docs/testing/phase-6-report.md](docs/testing/phase-6-report.md) e
+[ADR-010](docs/adr/ADR-010-observabilidade.md).
+
+**Nao inclui:** OpenTelemetry, backend de traces, CloudWatch Alarms. A trilha e uma
+ajuda para investigar, **nao um registro de auditoria**.
 
 ---
 

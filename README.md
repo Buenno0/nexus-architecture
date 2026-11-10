@@ -19,7 +19,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Cloud Infrastructure | 3 | Validado na AWS e **destruido** — custo real US$ 0,0001 |
 | Nexus Control Center | 4 | Implementado — 5 telas, roda local |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
-| Nexus Observability | 6 | Parcial (logging estruturado) |
+| Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
 | Performance Engineering | 7 | Nao iniciado |
 
 A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
@@ -183,6 +183,35 @@ Os tres conceitos de identidade (`idempotency_key`, `record_fingerprint` e entit
 resolution) sao distintos por design — ver
 [ADR-002](docs/adr/ADR-002-identidade-e-idempotencia.md).
 
+## Observabilidade (Fase 6)
+
+A trilha responde **"o que aconteceu com este registro"** atravessando os processos que
+o tocaram. Ate a Fase 5 essa pergunta nao tinha resposta: o `correlation_id` era
+propagado corretamente, mas o worker roda por `docker compose exec` e escrevia no
+terminal de quem o chamou, nao no log do container.
+
+| Rota | O que devolve |
+|---|---|
+| `GET /v1/observability/trail/{record_id}` | Jornada completa, em ordem, com o tempo entre marcos |
+| `GET /v1/observability/series?window=60` | Serie persistida da profundidade da plataforma |
+| `GET /v1/observability/alerts` | Condicoes ativas, derivadas do estado real |
+| `POST /v1/ops/sample` | Forca uma amostra — usada pelo EventBridge Scheduler |
+
+```bash
+curl -s "localhost:8080/v1/observability/trail/$(curl -s 'localhost:8080/v1/records?limit=1' | python3 -c 'import json,sys;print(json.load(sys.stdin)["items"][0]["record_id"])')" | python3 -m json.tool
+```
+
+**O delta entre marcos e o que importa.** O total diz que o registro levou 5.487 ms; o
+delta diz que 5.465 deles foram entre `published` e `consumed` — espera na fila, que
+nenhuma otimizacao do processador recuperaria. `ProcessingResult.end_to_end_ms` grava
+essa distincao em cada registro.
+
+Toda escrita de observabilidade e **best-effort**: falha e registrada em log e engolida.
+A trilha pode ter buracos e **nao serve como auditoria** — ver
+[ADR-010](docs/adr/ADR-010-observabilidade.md).
+
+---
+
 ## Dados sinteticos
 
 ```bash
@@ -202,6 +231,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - [docs/testing/phase-2-report.md](docs/testing/phase-2-report.md) — testes da Fase 2
 - [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) — testes da Fase 4
 - [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) — testes e qualidade da Fase 5
+- [docs/testing/phase-6-report.md](docs/testing/phase-6-report.md) — testes da Fase 6
 - [docs/performance/](docs/performance/) — medicoes
 - [docs/adr/](docs/adr/) — registros de decisao arquitetural
   - [ADR-001](docs/adr/ADR-001-dynamodb-local.md) — DynamoDB Local em vez de PostgreSQL
@@ -213,6 +243,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-007](docs/adr/ADR-007-versionamento-do-processador.md) — Versionamento do processador
   - [ADR-008](docs/adr/ADR-008-arquitetura-serverless.md) — Arquitetura serverless na AWS
   - [ADR-009](docs/adr/ADR-009-control-center.md) — Todo numero declara de onde veio
+  - [ADR-010](docs/adr/ADR-010-observabilidade.md) — Trilha durável, best-effort, por registro
 - [docs/runbook-deploy.md](docs/runbook-deploy.md) — procedimento de deploy e destruicao
 
 ## Limitacoes conhecidas
@@ -230,7 +261,16 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **O comportamento sob carga na AWS nao foi medido** — latencia, throttling e cold
   start no P99 sao escopo da Fase 7.
 - **Nenhum dominio proprio configurado.**
-- **O historico do dashboard vive na aba**: recarregar zera as series.
+- **Parte do historico do dashboard ainda vive na aba.** A profundidade da plataforma
+  passou a vir da serie persistida na Fase 6, mas as series de taxa das telas API e
+  Worker continuam acumuladas no navegador e zeram ao recarregar. O rotulo `sessao`
+  marca quais sao.
+- **A trilha nao e auditoria.** Best-effort por decisao: pode ter buracos. A garantia
+  continua em `StoredRecord` e `ProcessingResult`, que sao transacionais.
+- **A serie so avanca quando alguem observa.** Nao ha processo amostrando em laco. Com
+  o painel fechado, a janela tem buracos — e a interface diz quantos.
+- **A amostragem pelo EventBridge Scheduler nao foi validada na nuvem**, que esta
+  destruida. A rota existe e e testada localmente.
 - **O dashboard nao foi publicado na Vercel**; roda local contra a API em Docker.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.

@@ -6,6 +6,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 6 — Nexus Observability**
+
+- **Trilha durável atravessando processos**, chaveada por `record_id` na tabela base,
+  sem indice novo. Seis marcos — `accepted`, `published`, `consumed`, `resolved`,
+  `failed`, `dead_lettered` — com TTL de 7 dias (ADR-010).
+- **Toda escrita de observabilidade e best-effort** e nunca derruba a operacao que
+  descreve. Dois testes cobrem exatamente isso.
+- `ProcessingResult.end_to_end_ms`: separa "o processamento esta lento" de "a fila esta
+  acumulando". Delta negativo vira `None`, nao zero — relogios discordantes sao medicao
+  invalida, nao latencia pequena.
+- **Janela deslizante persistida** com amostragem oportunista e escrita condicional por
+  balde. Oito observadores simultaneos produzem uma amostra, nao oito.
+- **Seis alertas derivados do estado real**, nunca configurados a mao. Backlog grande e
+  backlog parado sao condicoes separadas.
+- Rotas `GET /v1/observability/trail/{record_id}`, `/series`, `/alerts` e
+  `POST /v1/ops/sample`.
+- Tela **Trail** com a linha do tempo e o delta entre marcos, faixa de alertas visivel
+  em todas as telas, e graficos de profundidade lendo a serie persistida — fecha a
+  limitacao que o ADR-009 registrou.
+- ADR-010 e `docs/testing/phase-6-report.md`.
+
+### Corrigido
+
+- O marco `resolved` lia `summary["decision"]`, chave que o processador de resolucao
+  nunca produziu. Substituida por `candidates_compared` e pelo sinal de truncamento.
+- O grafico da serie desenhava baldes nao medidos como passos regulares, desmentindo a
+  propria legenda. Eixo temporal e quebra de linha nos buracos.
+- `modules.observability` deixou de ser `"partial"` e passou a ser derivado.
+- O relatorio da Fase 4 dizia que o bundle inicial caiu "de 869 kB para 238 kB". Os
+  238 kB sao o chunk do Cognito que **saiu**; o bundle inicial e de 712 kB. Numero
+  publicado sem verificacao, corrigido no proprio relatorio.
+- A Fase 5 seguia marcada como pendente no ROADMAP apesar de concluida antes da Fase 3.
+- `correlation_id` de 32 caracteres transbordava o card no dashboard.
+- `control-center/tsconfig.tsbuildinfo` deixou de ser versionado.
+
 **Fase 4 — Nexus Control Center**
 
 - Dashboard em React 19 + TypeScript strict + Vite, com cinco telas: Overview, API,

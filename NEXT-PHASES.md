@@ -4,11 +4,16 @@ Documento de planejamento das Fases 3 a 8. Complementa o [ROADMAP.md](ROADMAP.md
 lista os itens; aqui estao o contexto, as decisoes ja tomadas que delimitam cada fase,
 as decisoes ainda em aberto e os criterios de aceite.
 
-Ultima atualizacao: 2026-11-07, ao concluir a construcao da Fase 3.
+Ultima atualizacao: 2026-11-10, ao concluir a Fase 6.
 
-> A Fase 5 foi concluida fora da ordem numerica, por nao depender da nuvem. Seu
-> planejamento permanece abaixo como registro; o resultado esta em
-> [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md).
+> As Fases 4, 5 e 6 ja foram concluidas — a 5 fora da ordem numerica, por nao depender
+> da nuvem. O planejamento delas permanece abaixo como registro do que se previa; os
+> resultados estao em [docs/testing/](docs/testing/).
+>
+> A Fase 6 foi entregue **sem CloudWatch**, ao contrario do que este documento previa:
+> a infraestrutura AWS esta destruida, e alarme que so existe na nuvem nao observa o
+> ambiente onde a plataforma roda hoje. Ver
+> [ADR-010](docs/adr/ADR-010-observabilidade.md).
 
 ---
 
@@ -251,7 +256,12 @@ auditavel e nenhuma fusao automatica em caso duvidoso.
 
 ---
 
-## Fase 6 — Nexus Observability
+## Fase 6 — Nexus Observability  *(concluida em 10/11/2026)*
+
+> O que foi realmente entregue esta em
+> [docs/testing/phase-6-report.md](docs/testing/phase-6-report.md). A diferenca
+> principal em relacao ao planejado abaixo: a trilha e chaveada por `record_id`, nao por
+> `correlation_id`, e nao houve CloudWatch.
 
 ### Objetivo
 

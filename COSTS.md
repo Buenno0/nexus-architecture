@@ -134,7 +134,43 @@ Em valores absolutos isso permanece dentro da franquia nos volumes previstos, ma
 decisao consciente de trocar custo por correcao. Ver
 [ADR-003](docs/adr/ADR-003-transactional-outbox.md).
 
----
+### Impacto da observabilidade (Fase 6)
+
+A trilha e a serie sao escritas adicionais no DynamoDB. Nenhum servico novo, nenhum
+recurso que cobre ocioso — mas nao sao de graca.
+
+| Item | Volume | Observacao |
+|---|---|---|
+| Marcos da trilha | ate **6 por registro** | `accepted`, `published`, `consumed`, `resolved` no caminho feliz; `failed` e `dead_lettered` somam nas falhas |
+| Tamanho do item | ~400 bytes | 1 WRU cada (a unidade cobre ate 1 KB) |
+| Amostras da serie | 1 por balde de 15s | **somente quando alguem observa** |
+| Leitura da trilha | 1 Query por consulta | sob demanda, no painel |
+
+Com 10.000 registros/mes e observacao continua:
+
+```
+trilha:   10.000 x 6                       =  60.000 WRU
+serie:    4/min x 60 x 24 x 30             = 172.800 WRU
+                                             ---------
+                                             232.800 WRU  =  0,2328 M
+
+0,2328 M x US$ 0,625/M  =  US$ 0,15/mes
+```
+
+**A serie custa quase o triplo da trilha** se alguem deixar o painel aberto o mes
+inteiro. Nao e um valor que assuste, mas e contraintuitivo: o custo da observabilidade
+aqui e dominado por quem observa, nao por quanto a plataforma processa.
+
+Em retentativa o numero sobe: cada tentativa gera `consumed` + `failed`. Um registro que
+esgota tres tentativas antes da DLQ produz **8 marcos** em vez de 4.
+
+**TTL de 7 dias em ambos.** A expiracao por TTL **nao consome WCU** — e das poucas
+operacoes gratuitas do DynamoDB, e e por isso que a retencao curta nao tem custo de
+limpeza.
+
+**Nao medido na AWS.** Os numeros acima sao aritmetica sobre a tabela de precos, nao
+observacao. A infraestrutura esta destruida desde 09/11/2026. O impacto sob carga real
+e tema da Fase 7.
 
 ## Armadilhas identificadas
 
