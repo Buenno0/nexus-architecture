@@ -65,6 +65,15 @@ cp infra/terraform/terraform.tfvars.example infra/terraform/terraform.tfvars
 Obrigatorio preencher `budget_notification_email`. Sem ele os alertas de orcamento nao
 chegam a lugar nenhum.
 
+> **O budget depende de uma tag de alocacao de custo ativada.** O Terraform ativa a tag
+> `Project` automaticamente (`aws_ce_cost_allocation_tag`), mas a AWS leva **ate 24
+> horas** para refletir, e so classifica uso **posterior** a ativacao.
+>
+> Nas primeiras 24 horas o alerta por valor acumulado ainda nao protege. O alerta por
+> PREVISAO cobre essa janela, por nao depender de historico.
+>
+> Para conferir: `aws ce list-cost-allocation-tags --status Active`.
+
 Decisao de custo neste ponto:
 
 | `dynamodb_billing_mode` | Custo | Limite |

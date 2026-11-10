@@ -5,9 +5,46 @@ estimado e autorizacao explicita.
 
 ## Situacao atual
 
-**US$ 0,00.** Nenhum recurso de nuvem provisionado. Tudo roda localmente em Docker.
+**US$ 0,00.** Nenhum recurso de nuvem provisionado.
 
-Fases 1 e 2 permanecem integralmente locais.
+## Custo real medido: deploy de 07 a 09/11/2026
+
+A plataforma rodou na AWS por tres dias e foi destruida em 09/11. Custo real, da conta
+inteira, no periodo:
+
+| Servico | Custo | Origem |
+|---|---|---|
+| **Amazon DynamoDB** | **US$ 0,0001** | Nexus (unica tabela da conta) |
+| Amazon API Gateway | US$ 0,0000 | Nexus, dentro da franquia |
+| Lambda, SQS, Cognito, Scheduler | US$ 0,0000 | Nexus, dentro da franquia |
+
+**Custo total do Nexus nos tres dias: cerca de um decimo de centavo.**
+
+Os demais valores da conta no periodo (ECS US$ 0,42, VPC US$ 0,32, S3 US$ 0,22,
+CloudWatch US$ 0,16) sao de outros projetos.
+
+> **Ressalva sobre a medicao.** A primeira consulta, filtrada pela tag
+> `Project=nexus-architecture`, devolveu US$ 0,00 — **mas nao porque nao houve gasto**.
+> Nenhuma tag de alocacao de custo estava ativada na conta, entao o filtro nao casava
+> com nada.
+>
+> Os numeros acima vem da apuracao por servico, sem filtro de tag, atribuindo ao Nexus
+> os servicos que so ele usava. O Terraform passou a ativar a tag automaticamente
+> (`aws_ce_cost_allocation_tag`), mas isso tem duas consequencias: leva ate 24h para
+> refletir e nao reclassifica gasto anterior.
+>
+> **O budget tinha o mesmo defeito**: seu `cost_filter` apontava para a tag inativa e
+> nunca teria disparado alerta. Corrigido.
+
+### Comparacao com a estimativa
+
+| | Estimado | Real (3 dias) |
+|---|---|---|
+| DynamoDB | ~US$ 0,10/mes | US$ 0,0001 |
+| Demais servicos | US$ 0,00 | US$ 0,00 |
+
+O volume da demonstracao foi muito menor que os 10.000 registros/mes da estimativa, o
+que explica a diferenca. A estimativa continua valida para o volume que ela assume.
 
 ---
 

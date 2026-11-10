@@ -16,15 +16,17 @@ processados de forma assincrona, correlacionados e monitorados.
 |---|---|---|
 | Nexus Ingestion | 1 | Implementado |
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
-| Cloud Infrastructure | 3 | **Implantado na AWS** — ~US$ 0,10/mes |
+| Cloud Infrastructure | 3 | Validado na AWS e **destruido** — custo real US$ 0,0001 |
 | Nexus Control Center | 4 | Nao iniciado |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Parcial (logging estruturado) |
 | Performance Engineering | 7 | Nao iniciado |
 
-A plataforma roda localmente em Docker **e** na AWS, implantada em 07/11/2026 na
-conta 541099637415 com 48 recursos e custo estimado de ~US$ 0,10/mes. A hosted zone do
-Route 53 — unico custo fixo — nao foi criada. Ver
+A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
+validada ponta a ponta; em 09/11 foi **destruida**, deixando a conta limpa. Custo real
+dos tres dias: **US$ 0,0001**.
+
+A infraestrutura como codigo continua pronta para reaplicar — ver
 [docs/runbook-deploy.md](docs/runbook-deploy.md) e [COSTS.md](COSTS.md).
 
 ---
@@ -98,7 +100,7 @@ make reprocess && make drain && make resolution
 make reviews
 ```
 
-## AWS (Fase 3) — implantada
+## AWS (Fase 3) — validada e destruida
 
 ```bash
 make lambda
@@ -108,13 +110,18 @@ make lambda
 make tf-validate
 ```
 
-Para destruir tudo:
+Para aplicar, e para destruir depois:
+
+```bash
+cd infra/terraform && terraform apply
+```
 
 ```bash
 cd infra/terraform && terraform destroy
 ```
 
-Procedimento completo, incluindo criacao de operador no Cognito, em
+Procedimento completo, incluindo criacao de operador no Cognito e a tabela de
+diagnostico com os defeitos que o deploy real revelou, em
 [docs/runbook-deploy.md](docs/runbook-deploy.md).
 
 ### Medir a qualidade da resolucao

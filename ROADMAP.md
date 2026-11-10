@@ -47,18 +47,33 @@ API de entrada com validacao, normalizacao, idempotencia e outbox transacional.
 
 ---
 
-## Fase 3 — Cloud Infrastructure
+## Fase 3 — Cloud Infrastructure  *(validada na AWS e destruida)*
 
-- [ ] IAM com privilegio minimo
-- [ ] DynamoDB On-Demand + GSI esparso
-- [ ] SQS + DLQ (`maxReceiveCount = 3`)
-- [ ] Lambda de ingestao via Mangum + API Gateway HTTP API
-- [ ] Lambda de worker com invocacao explicita (sem event source mapping)
-- [ ] CloudWatch Logs com retencao de 7 dias
-- [ ] AWS Budget com alerta
-- [ ] Limites de concorrencia por funcao
+- [x] IAM com privilegio minimo — nenhum curinga aberto em Action ou Resource
+- [x] DynamoDB On-Demand com os 4 GSIs, incluindo os esparsos
+- [x] SQS + DLQ com `maxReceiveCount = 3`
+- [x] Lambda de ingestao via Mangum + API Gateway HTTP API
+- [x] Lambda de worker com invocacao explicita (sem event source mapping)
+- [x] Cognito User Pool com authorizer JWT
+- [x] EventBridge Scheduler como rede de seguranca
+- [x] CloudWatch Logs com retencao de 7 dias
+- [x] AWS Budget com alertas em US$ 5, US$ 10 e por previsao
+- [x] Limites de concorrencia — a cota da conta e o teto efetivo
+- [x] Empacotamento cruzado para Linux arm64
+- [x] Runbook de deploy e de destruicao
+- [x] **Implantado em 07/11/2026** apos autorizacao explicita
+- [x] **Validado na nuvem**: saude, autenticacao JWT, ingestao, consumo e resolucao
+- [x] **Destruido em 09/11/2026** — conta verificada limpa em 10 categorias
+- [ ] Dominio proprio e certificado ACM — Fase 4
+- [ ] Medicao sob carga — Fase 7
 
-**Bloqueio:** nenhum recurso pago sera criado sem apresentacao previa de custo e
+**Custo real dos tres dias no ar: US$ 0,0001.** Nenhum recurso remanescente.
+
+O deploy real revelou oito defeitos que nenhum teste local pegaria, catalogados em
+[docs/testing/phase-3-report.md](docs/testing/phase-3-report.md) — entre eles um budget
+que nunca teria disparado e uma recomendacao minha de custo que sairia a US$ 56,94/mes.
+
+**Bloqueio mantido:** nenhum recurso pago sera criado sem apresentacao previa de custo e
 autorizacao explicita.
 
 ---
