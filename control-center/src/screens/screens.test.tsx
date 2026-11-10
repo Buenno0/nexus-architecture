@@ -7,6 +7,7 @@ import { Overview } from "./Overview";
 import { QueueMonitoring } from "./QueueMonitoring";
 import { WorkerMonitoring } from "./WorkerMonitoring";
 import {
+  alertasVazios,
   metricsFalso,
   mockarApi,
   mockarFalhaTotal,
@@ -14,6 +15,7 @@ import {
   renderizar,
   resolucaoFalsa,
   revisoesFalsas,
+  serieFalsa,
 } from "../test-utils";
 
 const API_COMPLETA = {
@@ -23,6 +25,8 @@ const API_COMPLETA = {
   "/v1/resolution/reviews": revisoesFalsas,
   "/health": { status: "ok", environment: "local", version: "0.1.0", persistence: "ok", queue: "enabled" },
   "/v1/records": { items: [], next_cursor: null },
+  "/v1/observability/alerts": alertasVazios,
+  "/v1/observability/series": serieFalsa,
 };
 
 afterEach(() => vi.unstubAllGlobals());

@@ -194,3 +194,62 @@ export interface ApiError {
   correlation_id: string;
   details?: Record<string, unknown>;
 }
+
+// ------------------------------------------------------------- observabilidade
+
+/** Marco na jornada de uma observacao — ADR-010. */
+export interface TrailEvent {
+  stage: "accepted" | "published" | "consumed" | "resolved" | "failed" | "dead_lettered";
+  occurred_at: string;
+  correlation_id: string;
+  service: string;
+  detail: Record<string, unknown>;
+  /**
+   * Tempo desde o marco anterior; `null` no primeiro.
+   *
+   * E aqui que o gargalo aparece. O total diz que o registro levou oito segundos; o
+   * delta diz que sete foram entre `published` e `consumed` — espera na fila, que
+   * nenhuma otimizacao do processador recupera.
+   */
+  delta_ms: number | null;
+}
+
+export interface Trail {
+  record_id: string;
+  events: TrailEvent[];
+  total_ms: number | null;
+  /** Varios nomes aqui provam que a trilha atravessa processos. */
+  services: string[];
+}
+
+export interface SeriesPoint {
+  bucket: string;
+  values: Record<string, number>;
+}
+
+export interface Series {
+  metric: string;
+  /** Sempre "persistido": vem do armazenamento, nao da memoria desta aba. */
+  origin: Origem;
+  interval_seconds: number;
+  window_minutes: number;
+  points: SeriesPoint[];
+  /** Baldes sem amostra. A amostragem e oportunista — ver ADR-010. */
+  gaps: number;
+}
+
+export interface Alert {
+  id: string;
+  severity: "error" | "warning";
+  title: string;
+  detail: string;
+  origin: Origem;
+  value: number | null;
+  threshold: number | null;
+  context: Record<string, unknown>;
+}
+
+export interface Alerts {
+  alerts: Alert[];
+  evaluated_at: string;
+}

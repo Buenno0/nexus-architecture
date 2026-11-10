@@ -5,12 +5,21 @@ import { ErrorState } from "../components/ErrorState";
 import { OpButton } from "../components/OpButton";
 import { Grade, Panel } from "../components/Panel";
 import { ResultLine } from "../components/ResultLine";
+import { OriginBadge } from "../components/OriginBadge";
 import { StatTile } from "../components/StatTile";
-import { useDispatch, useMetrics, useProcess, useQueueStats, useRedrive, useReprocess } from "../api/queries";
+import {
+  useDispatch,
+  useMetrics,
+  usePersistedSeries,
+  useProcess,
+  useQueueStats,
+  useRedrive,
+  useReprocess,
+} from "../api/queries";
 import { enviarLote, montarLote } from "../api/generator";
 import type { ProgressoGeracao } from "../api/generator";
 import { somarPorNome } from "../metrics/parse";
-import { useSessionSeries } from "../metrics/useSessionSeries";
+import { descreverCobertura, paraPontos } from "../metrics/persisted";
 
 const VOLUMES = [100, 1_000, 10_000] as const;
 /** Acima disso, gerar pede confirmacao: e trabalho em volume. */
@@ -31,12 +40,13 @@ export function QueueMonitoring() {
   const guardar = (r: object) => setResultado({ ...r });
   const [progresso, setProgresso] = useState<ProgressoGeracao | null>(null);
 
-  const serie = useSessionSeries(
-    queue.data
-      ? { pendentes: queue.data.pending, em_voo: queue.data.in_flight, dlq: queue.data.dead, outbox: queue.data.outbox_pending }
-      : null,
-    queue.dataUpdatedAt,
-  );
+  const serie = usePersistedSeries(60);
+  const pontos = paraPontos(serie.data?.points ?? [], {
+    queue_pending: "aguardando",
+    queue_in_flight: "em voo",
+    queue_dead: "dead letter",
+    outbox_pending: "outbox",
+  });
 
   if (queue.isError) {
     return <ErrorState erro={queue.error} onTentarNovamente={() => void queue.refetch()} />;
@@ -160,16 +170,21 @@ export function QueueMonitoring() {
         </Grade>
       </Panel>
 
-      <Panel titulo="Historico da fila na sessao">
+      <Panel
+        titulo="Historico da fila"
+        descricao={descreverCobertura(serie.data)}
+        acoes={<OriginBadge origem="persistido" />}
+      >
         <Chart
-          pontos={serie}
+          pontos={pontos}
           series={[
-            { chave: "pendentes", rotulo: "aguardando" },
-            { chave: "em_voo", rotulo: "em voo" },
-            { chave: "dlq", rotulo: "dead letter" },
+            { chave: "aguardando", rotulo: "aguardando" },
+            { chave: "em voo", rotulo: "em voo" },
+            { chave: "dead letter", rotulo: "dead letter" },
             { chave: "outbox", rotulo: "outbox" },
           ]}
           altura={240}
+          vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
         />
       </Panel>
     </>

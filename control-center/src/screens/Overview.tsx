@@ -2,10 +2,18 @@ import { Chart } from "../components/Chart";
 import { ErrorState } from "../components/ErrorState";
 import { Loading } from "../components/Loading";
 import { Grade, Panel } from "../components/Panel";
+import { OriginBadge } from "../components/OriginBadge";
 import { StatTile } from "../components/StatTile";
-import { useHealth, useMetrics, useQueueStats, useRecords, useResolutionStats } from "../api/queries";
+import {
+  useHealth,
+  useMetrics,
+  usePersistedSeries,
+  useQueueStats,
+  useRecords,
+  useResolutionStats,
+} from "../api/queries";
 import { somarPorNome } from "../metrics/parse";
-import { useSessionSeries } from "../metrics/useSessionSeries";
+import { descreverCobertura, paraPontos } from "../metrics/persisted";
 
 export function Overview() {
   const metrics = useMetrics();
@@ -15,12 +23,16 @@ export function Overview() {
   const records = useRecords("person", 8);
 
   const contadores = metrics.data?.counters ?? null;
-  const serie = useSessionSeries(
-    queue.data
-      ? { pendentes: queue.data.pending, em_voo: queue.data.in_flight, dlq: queue.data.dead }
-      : null,
-    queue.dataUpdatedAt,
-  );
+
+  // Serie do armazenamento, nao da memoria desta aba: sobrevive a recarregar a pagina
+  // e a reiniciar a API. Era a limitacao que o ADR-009 registrou e a Fase 6 fechou.
+  const serie = usePersistedSeries(60);
+  const pontos = paraPontos(serie.data?.points ?? [], {
+    queue_pending: "aguardando",
+    queue_in_flight: "em voo",
+    queue_dead: "dead letter",
+    outbox_pending: "outbox",
+  });
 
   if (metrics.isError) return <ErrorState erro={metrics.error} onTentarNovamente={() => void metrics.refetch()} />;
 
@@ -122,16 +134,19 @@ export function Overview() {
       </Panel>
 
       <Panel
-        titulo="Profundidade da fila ao longo da sessao"
-        descricao="Serie montada neste navegador. Recarregar a pagina zera."
+        titulo="Profundidade da plataforma"
+        descricao={descreverCobertura(serie.data)}
+        acoes={<OriginBadge origem="persistido" />}
       >
         <Chart
-          pontos={serie}
+          pontos={pontos}
           series={[
-            { chave: "pendentes", rotulo: "aguardando" },
-            { chave: "em_voo", rotulo: "em voo" },
-            { chave: "dlq", rotulo: "dead letter" },
+            { chave: "aguardando", rotulo: "aguardando" },
+            { chave: "em voo", rotulo: "em voo" },
+            { chave: "dead letter", rotulo: "dead letter" },
+            { chave: "outbox", rotulo: "outbox" },
           ]}
+          vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
         />
       </Panel>
 

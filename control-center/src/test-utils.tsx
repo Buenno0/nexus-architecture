@@ -5,7 +5,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { vi } from "vitest";
 
-import type { Metrics, QueueStats, ResolutionStats, ReviewPage } from "./api/types";
+import type { Alerts, Metrics, QueueStats, ResolutionStats, ReviewPage, Series, Trail } from "./api/types";
 
 export function renderizar(ui: ReactElement) {
   const cliente = new QueryClient({
@@ -26,7 +26,7 @@ export const metricsFalso: Metrics = {
     ingestion: "implemented",
     queue_engine: "implemented",
     entity_resolution: "implemented",
-    observability: "partial",
+    observability: "implemented",
   },
   counters: {
     "ingestion_accepted_total{record_type=person}": 42,
@@ -94,6 +94,38 @@ export const revisoesFalsas: ReviewPage = {
         ],
       },
     },
+  ],
+};
+
+export const alertasVazios: Alerts = {
+  alerts: [],
+  evaluated_at: "2026-11-10T12:00:00+00:00",
+};
+
+export const serieFalsa: Series = {
+  metric: "platform",
+  origin: "persistido",
+  interval_seconds: 15,
+  window_minutes: 60,
+  gaps: 236,
+  points: [
+    { bucket: "2026-11-10T11:58:00+00:00", values: { queue_pending: 3, queue_in_flight: 1, queue_dead: 0, outbox_pending: 0 } },
+    { bucket: "2026-11-10T11:58:15+00:00", values: { queue_pending: 5, queue_in_flight: 1, queue_dead: 0, outbox_pending: 2 } },
+    { bucket: "2026-11-10T11:58:30+00:00", values: { queue_pending: 1, queue_in_flight: 0, queue_dead: 0, outbox_pending: 0 } },
+    { bucket: "2026-11-10T11:58:45+00:00", values: { queue_pending: 0, queue_in_flight: 0, queue_dead: 0, outbox_pending: 0 } },
+  ],
+};
+
+/** Trilha que atravessa API e worker — o caso que a Fase 6 existe para tornar possivel. */
+export const trilhaFalsa: Trail = {
+  record_id: "01TESTE",
+  total_ms: 7060,
+  services: ["api", "worker"],
+  events: [
+    { stage: "accepted", occurred_at: "2026-11-10T12:00:00.000+00:00", correlation_id: "corr-1", service: "api", detail: { source: "testes" }, delta_ms: null },
+    { stage: "published", occurred_at: "2026-11-10T12:00:00.040+00:00", correlation_id: "corr-1", service: "api", detail: { via: "inline" }, delta_ms: 40 },
+    { stage: "consumed", occurred_at: "2026-11-10T12:00:07.000+00:00", correlation_id: "corr-1", service: "worker", detail: { attempt: 1 }, delta_ms: 6960 },
+    { stage: "resolved", occurred_at: "2026-11-10T12:00:07.060+00:00", correlation_id: "corr-1", service: "worker", detail: { decision: "MATCH" }, delta_ms: 60 },
   ],
 };
 

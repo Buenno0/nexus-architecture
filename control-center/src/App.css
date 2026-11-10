@@ -127,3 +127,165 @@
     padding: 14px;
   }
 }
+
+/* ------------------------------------------------------------------- trilha */
+
+.trilha__busca {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.trilha__campo {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--superficie);
+  border: 1px solid var(--borda-forte);
+  border-radius: 4px;
+  color: var(--texto);
+  font-size: 12px;
+}
+
+.trilha__campo:focus {
+  outline: none;
+  border-color: var(--info);
+}
+
+.trilha__recentes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.trilha__recentes-rotulo {
+  font-size: 11px;
+  color: var(--texto-fraco);
+}
+
+.trilha__atalho {
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid var(--borda);
+  border-radius: 3px;
+  color: var(--texto-suave);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.trilha__atalho:hover {
+  border-color: var(--info);
+  color: var(--texto);
+}
+
+.linha {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.linha__item {
+  display: flex;
+  gap: 12px;
+  padding: 0 0 14px 0;
+  position: relative;
+}
+
+.linha__item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  bottom: 0;
+  width: 1px;
+  background: var(--borda-forte);
+}
+
+.linha__marcador {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--info);
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.linha__marcador--atencao {
+  background: var(--atencao);
+}
+
+.linha__marcador--erro {
+  background: var(--erro);
+}
+
+.linha__corpo {
+  flex: 1;
+  min-width: 0;
+}
+
+.linha__cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.linha__estagio {
+  font-size: 13px;
+  color: var(--texto);
+  font-weight: 500;
+}
+
+.linha__servico {
+  font-size: 11px;
+  color: var(--info);
+}
+
+.linha__hora,
+.linha__delta {
+  font-size: 11px;
+  color: var(--texto-fraco);
+}
+
+.linha__delta {
+  color: var(--texto-suave);
+}
+
+.linha__intervalo {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--texto-fraco);
+}
+
+.linha__detalhe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 6px 0 0;
+}
+
+.linha__detalhe div {
+  display: flex;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.linha__detalhe dt {
+  color: var(--texto-fraco);
+}
+
+.linha__detalhe dd {
+  margin: 0;
+  color: var(--texto-suave);
+}
+
+.nota {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--texto-fraco);
+}

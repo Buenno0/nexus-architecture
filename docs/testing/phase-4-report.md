@@ -88,7 +88,17 @@ explicitas e recusa de `*`.
 ### 4. Bundle carregava o SDK do Cognito sem uso
 
 O SDK pesa centenas de kilobytes e so e usado quando o dashboard aponta para a AWS.
-Importacao dinamica derrubou o bundle inicial de **869 kB para 238 kB**.
+A importacao dinamica o tirou do caminho inicial.
+
+> **Correcao registrada na Fase 6.** A frase original dizia que o bundle inicial caiu
+> "de 869 kB para 238 kB". Esta errado, e o erro e meu. Os 238 kB sao o **pedaco que
+> saiu** — o chunk do Cognito, carregado sob demanda —, nao o que ficou. O `index.html`
+> aponta para o outro arquivo: o bundle inicial caiu de ~950 kB para **712 kB**.
+>
+> Eu li a saida do `vite build` de cima para baixo e assumi que a linha menor era a
+> entrada, sem abrir o `index.html` para confirmar. Numero publicado sem verificacao,
+> exatamente o que a secao 9 do projeto manda nao fazer. O defeito so apareceu na Fase 6
+> porque alguem voltou a comparar o build com o anterior.
 
 ## Limitacoes conhecidas
 

@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { config } from "./config";
 import { novaChaveDeIdempotencia, request } from "./client";
 import type {
+  Alerts,
   DispatchResult,
   Entity,
   Health,
@@ -22,6 +23,8 @@ import type {
   ReprocessResult,
   ResolutionStats,
   ReviewPage,
+  Series,
+  Trail,
 } from "./types";
 
 const polling = { refetchInterval: config.pollIntervalMs, refetchOnWindowFocus: true } as const;
@@ -34,6 +37,9 @@ export const chaves = {
   reviews: ["resolution", "reviews"] as const,
   records: (tipo: string, limite: number) => ["records", tipo, limite] as const,
   entity: (id: string) => ["resolution", "entity", id] as const,
+  alerts: ["observability", "alerts"] as const,
+  series: (janela: number) => ["observability", "series", janela] as const,
+  trail: (id: string) => ["observability", "trail", id] as const,
 };
 
 export function useHealth() {
@@ -172,5 +178,49 @@ export function ingerir(
     method: "POST",
     body: payload,
     idempotencyKey: novaChaveDeIdempotencia(),
+  });
+}
+
+// ------------------------------------------------------------- observabilidade
+
+/**
+ * Alertas ativos, consultados em todas as telas.
+ *
+ * Avaliados no servidor a partir do estado real a cada chamada. O navegador nao
+ * decide nada: um limiar duplicado aqui divergiria do backend no primeiro ajuste.
+ */
+export function useAlerts() {
+  return useQuery({
+    queryKey: chaves.alerts,
+    queryFn: () => request<Alerts>("/v1/observability/alerts"),
+    ...polling,
+  });
+}
+
+/**
+ * Serie persistida da profundidade da plataforma.
+ *
+ * Ao contrario de `useSessionSeries`, isto sobrevive a recarregar a pagina e a
+ * reiniciar a API — era a limitacao que o ADR-009 registrou.
+ */
+export function usePersistedSeries(janelaMinutos: number) {
+  return useQuery({
+    queryKey: chaves.series(janelaMinutos),
+    queryFn: () => request<Series>(`/v1/observability/series?window=${janelaMinutos}`),
+    ...polling,
+  });
+}
+
+/**
+ * Jornada de uma observacao. So busca quando ha um identificador.
+ *
+ * Trilha vazia nao e erro: ela e best-effort e expira em sete dias.
+ */
+export function useTrail(recordId: string) {
+  return useQuery({
+    queryKey: chaves.trail(recordId),
+    queryFn: () => request<Trail>(`/v1/observability/trail/${encodeURIComponent(recordId)}`),
+    enabled: recordId.length > 0,
+    refetchOnWindowFocus: false,
   });
 }

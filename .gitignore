@@ -47,3 +47,6 @@ node_modules/
 control-center/dist/
 control-center/coverage/
 control-center/.env.local
+
+# Cache incremental do TypeScript — artefato de build, nao fonte.
+control-center/tsconfig.tsbuildinfo

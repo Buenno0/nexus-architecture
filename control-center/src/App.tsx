@@ -8,8 +8,10 @@ import { EntityResolution } from "./screens/EntityResolution";
 import { Login } from "./screens/Login";
 import { Overview } from "./screens/Overview";
 import { QueueMonitoring } from "./screens/QueueMonitoring";
+import { Trail } from "./screens/Trail";
 import { WorkerMonitoring } from "./screens/WorkerMonitoring";
-import { useHealth } from "./api/queries";
+import { AlertBanner } from "./components/AlertBanner";
+import { useAlerts, useHealth } from "./api/queries";
 
 const TELAS = [
   { id: "overview", rotulo: "Overview", componente: Overview },
@@ -17,6 +19,7 @@ const TELAS = [
   { id: "queue", rotulo: "Queue", componente: QueueMonitoring },
   { id: "worker", rotulo: "Worker", componente: WorkerMonitoring },
   { id: "resolution", rotulo: "Entity Resolution", componente: EntityResolution },
+  { id: "trail", rotulo: "Trail", componente: Trail },
 ] as const;
 
 type TelaId = (typeof TELAS)[number]["id"];
@@ -25,6 +28,7 @@ export function App() {
   const [tela, setTela] = useState<TelaId>("overview");
   const { autenticado, modo, usuario, sair } = useAuth();
   const health = useHealth();
+  const alertas = useAlerts();
 
   if (!autenticado) return <Login />;
 
@@ -74,6 +78,9 @@ export function App() {
       </header>
 
       <main className="conteudo">
+        {/* A faixa fica fora da tela ativa: um alerta de DLQ importa tanto na tela de
+            resolucao quanto na da fila, e so apareceria numa delas se vivesse dentro. */}
+        <AlertBanner alertas={alertas.data?.alerts} erro={alertas.isError} />
         <Componente />
       </main>
 
