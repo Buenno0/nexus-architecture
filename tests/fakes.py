@@ -357,7 +357,6 @@ class FakeRepository(RecordRepository):
         with self._lock:
             return dict(self.stats)
 
-
     # ------------------------------------------------------------ observabilidade
 
     def record_trail(self, event: TrailEvent) -> bool:
@@ -390,9 +389,7 @@ class FakeRepository(RecordRepository):
     def oldest_pending_outbox_at(self) -> datetime | None:
         with self._lock:
             pendentes = [
-                e.next_attempt_at
-                for e in self.events.values()
-                if e.status == OutboxStatus.PENDING
+                e.next_attempt_at for e in self.events.values() if e.status == OutboxStatus.PENDING
             ]
         return min(pendentes) if pendentes else None
 
@@ -404,6 +401,8 @@ class RecordingQueueClient(QueueClient):
         self._enabled = enabled
         self._fail = fail
         self.published: list[QueueMessage] = []
+        #: Profundidade da DLQ, ajustavel pelos testes de alerta.
+        self.dead_count = 0
 
     @property
     def is_enabled(self) -> bool:
@@ -433,7 +432,7 @@ class RecordingQueueClient(QueueClient):
         return False
 
     def stats(self) -> QueueStats:
-        return QueueStats(pending=len(self.published))
+        return QueueStats(pending=len(self.published), dead=self.dead_count)
 
     def redrive(self, *, limit: int) -> int:
         return 0
