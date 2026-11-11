@@ -99,5 +99,12 @@ fmt:       ## Formata o codigo
 generate:  ## Gera e envia N registros sinteticos (make generate N=1000)
 	$(PY) tools/generator.py --count $(N) --post
 
+load:      ## Uma corrida de carga (make load NOME=exp USUARIOS=50 DURACAO=60s)
+	$(PY) tools/loadtest.py --nome $(or $(NOME),ad-hoc) \
+		--usuarios $(or $(USUARIOS),50) --duracao $(or $(DURACAO),60s)
+
+campaign:  ## Campanha completa da Fase 7 (DESTRUTIVO: zera os dados entre corridas)
+	$(PY) tools/campanha.py --tudo
+
 clean:     ## Remove containers e volumes (DESTRUTIVO: apaga os dados locais)
 	docker compose down -v

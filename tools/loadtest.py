@@ -53,6 +53,41 @@ def ler(caminho: str) -> dict[str, Any] | None:
         return None
 
 
+def processos_da_api() -> int | None:
+    """Quantos processos atendem requisicoes no container da API.
+
+    Contado, nao informado. A alternativa seria o arnes aceitar um rotulo de quem
+    executa, e um rotulo pode estar errado — foi assim que o relatorio da Fase 4
+    publicou um tamanho de bundle que ninguem tinha conferido.
+
+    Com ``--workers N`` (N > 1) o uvicorn cria os trabalhadores por
+    ``multiprocessing``, e a linha de comando deles **nao menciona uvicorn**: e
+    ``spawn_main``. Contar por "uvicorn" devolveria 1 em qualquer configuracao — um
+    numero plausivel e sempre errado, que e o pior tipo. Com ``--workers 1`` nao ha
+    multiprocessing nenhum: o proprio supervisor atende.
+    """
+    comando = (
+        "w=0; u=0; for d in /proc/*/cmdline; do "
+        r'linha=$(tr "\0" " " < "$d" 2>/dev/null); '
+        'case "$linha" in '
+        "*spawn_mai[n]*) w=$((w+1));; "
+        "*uvicor[n]*) u=$((u+1));; "
+        "esac; done; "
+        "if [ $w -gt 0 ]; then echo $w; else echo $u; fi"
+    )
+    try:
+        saida = subprocess.run(
+            ["docker", "exec", "nexus-api", "sh", "-c", comando],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        return int(saida.stdout.strip())
+    except (ValueError, OSError, subprocess.SubprocessError):
+        return None
+
+
 def estado() -> dict[str, Any]:
     """Fotografia da plataforma: contadores, fila e outbox."""
     metrics = ler("/metrics") or {}
@@ -124,6 +159,7 @@ def resumir(linhas: list[dict[str, str]]) -> dict[str, Any]:
     """
     cenarios: dict[str, Any] = {}
     agregado: dict[str, Any] = {}
+    preparo: dict[str, Any] = {}
     for linha in linhas:
         nome = linha["Name"]
         dado = {
@@ -138,9 +174,15 @@ def resumir(linhas: list[dict[str, str]]) -> dict[str, Any]:
         }
         if linha["Type"] == "" or nome == "Aggregated":
             agregado = dado
+        elif "[preparo]" in nome:
+            # Uma requisicao por usuario, no instante em que ele sobe, contra conexoes
+            # ainda nao estabelecidas. E um aquecimento, nao regime permanente, e
+            # misturado ao resto empurra a cauda do agregado para cima sem representar
+            # nada que um cliente real veria depois do primeiro segundo.
+            preparo = dado
         else:
             cenarios[f"{linha['Type']} {nome}"] = dado
-    return {"agregado": agregado, "cenarios": cenarios}
+    return {"agregado": agregado, "cenarios": cenarios, "aquecimento": preparo}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -150,6 +192,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--taxa", type=float, default=10)
     parser.add_argument("--duracao", default="60s")
     parser.add_argument("--nota", default="", help="o que esta corrida quer responder")
+    parser.add_argument(
+        "--acervo",
+        type=int,
+        default=None,
+        help="registros pre-carregados antes da corrida, para o eixo de volume",
+    )
     args = parser.parse_args(argv)
 
     SAIDA.mkdir(parents=True, exist_ok=True)
@@ -180,8 +228,9 @@ def main(argv: list[str] | None = None) -> int:
         },
         "ambiente": {
             "trail_enabled": saude.get("trail_enabled"),
-            "api_workers": saude.get("api_workers"),
+            "api_workers": processos_da_api(),
             "environment": saude.get("environment"),
+            "registros_pre_carregados": args.acervo,
         },
         "latencia": resumir(linhas),
         "contadores_delta": delta(antes, depois),
