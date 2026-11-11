@@ -11,6 +11,13 @@ services:
       - "8000:8000"
     volumes:
       - dynamodb-data:/home/dynamodblocal/data
+    # Teto explicito de recursos — Fase 7.
+    #
+    # Sem isso, API, banco e gerador de carga disputam os mesmos nucleos e o numero
+    # medido depende de quem ganhou o escalonador naquele segundo. Com o teto, a
+    # medicao vira reprodutivel e passa a ter uma unidade: "2 nucleos".
+    cpus: ${NEXUS_DYNAMO_CPUS:-2.0}
+    mem_limit: ${NEXUS_DYNAMO_MEM:-2g}
     healthcheck:
       test:
         - CMD-SHELL
@@ -38,6 +45,8 @@ services:
       NEXUS_QUEUE_BACKEND: ${NEXUS_QUEUE_BACKEND:-sqlite}
       NEXUS_QUEUE_PATH: /data/nexus-queue.db
       NEXUS_FAILURE_INJECTION_RATE: ${NEXUS_FAILURE_INJECTION_RATE:-0.0}
+      # Desliga a gravacao da trilha — ADR-010. A Fase 7 compara os dois lados.
+      NEXUS_TRAIL_ENABLED: ${NEXUS_TRAIL_ENABLED:-true}
       # Credenciais falsas exigidas pelo SDK para falar com o DynamoDB Local.
       # Nao sao segredos — ver SECURITY.md.
       AWS_ACCESS_KEY_ID: local
@@ -46,10 +55,16 @@ services:
       - "8080:8080"
     volumes:
       - queue-data:/data
+    cpus: ${NEXUS_API_CPUS:-2.0}
+    mem_limit: ${NEXUS_API_MEM:-2g}
     command:
       - sh
       - -c
-      - python -m nexus.persistence.tables && exec uvicorn nexus.ingestion.api:app --host 0.0.0.0 --port 8080
+      # --workers e variavel desde a Fase 7. Com um unico processo, o teto de
+      # throughput e o de um nucleo, e mediriamos a configuracao em vez da
+      # arquitetura. O padrao segue 1: e o que o desenvolvimento usa, e mudar o
+      # padrao por causa de um teste de carga seria otimizar para o benchmark.
+      - python -m nexus.persistence.tables && exec uvicorn nexus.ingestion.api:app --host 0.0.0.0 --port 8080 --workers ${NEXUS_API_WORKERS:-1}
 
 volumes:
   dynamodb-data:

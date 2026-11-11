@@ -56,7 +56,7 @@ class IngestionService:
         self._repo = repository
         self._queue = queue
         self._settings = settings or get_settings()
-        self._trail = trail or TrailRecorder(repository, "api")
+        self._trail = trail or TrailRecorder(repository, "api", self._settings)
 
     # ------------------------------------------------------------------ publico
 

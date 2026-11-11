@@ -114,6 +114,12 @@ class HealthOut(BaseModel):
     version: str
     persistence: Literal["ok", "unavailable"]
     queue: Literal["enabled", "not_implemented"]
+    #: Se a trilha esta gravando — ADR-010.
+    #:
+    #: Esta aqui para a Fase 7: um resultado de carga que nao diz se a instrumentacao
+    #: estava ligada nao pode ser comparado com nenhum outro. Derivado da configuracao
+    #: efetiva, nunca de um rotulo passado por quem mede.
+    trail_enabled: bool = True
 
 
 class ErrorOut(BaseModel):

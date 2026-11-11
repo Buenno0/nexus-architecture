@@ -16,6 +16,7 @@ from typing import Any
 from nexus.persistence.models import TrailEvent, TrailStage
 from nexus.persistence.repository import RecordRepository
 from nexus.shared.clock import utcnow
+from nexus.shared.config import Settings, get_settings
 from nexus.shared.logging import get_correlation_id, get_logger
 
 logger = get_logger(__name__)
@@ -24,9 +25,15 @@ logger = get_logger(__name__)
 class TrailRecorder:
     """Registra marcos da jornada de uma observacao."""
 
-    def __init__(self, repository: RecordRepository, service: str) -> None:
+    def __init__(
+        self,
+        repository: RecordRepository,
+        service: str,
+        settings: Settings | None = None,
+    ) -> None:
         self._repo = repository
         self._service = service
+        self._enabled = (settings or get_settings()).trail_enabled
 
     def marcar(
         self,
@@ -43,6 +50,9 @@ class TrailRecorder:
         o recurso de ultimo caso: ela acerta quando o middleware a preencheu e erra em
         silencio quando nao, gravando o identificador de outra requisicao.
         """
+        if not self._enabled:
+            return
+
         try:
             evento = TrailEvent(
                 record_id=record_id,

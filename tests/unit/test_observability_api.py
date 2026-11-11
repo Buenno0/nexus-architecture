@@ -226,3 +226,28 @@ class TestMetricsDeclaraObservabilidade:
 
         assert corpo["modules"]["observability"] == "implemented"
         assert corpo["series_sampled"] is True
+
+
+class TestSaudeDeclaraAConfiguracao:
+    """`/health` diz se a trilha esta gravando — e o rotulo de toda corrida de carga.
+
+    Um resultado de desempenho que nao diz se a instrumentacao estava ligada nao pode
+    ser comparado com nenhum outro. O valor e derivado da configuracao efetiva, nunca
+    de um rotulo informado por quem mede.
+    """
+
+    def test_reflete_a_trilha_ligada(self, client: TestClient) -> None:
+        assert client.get("/health").json()["trail_enabled"] is True
+
+    def test_reflete_a_trilha_desligada(
+        self, repo: FakeRepository, fila: RecordingQueueClient
+    ) -> None:
+        desligado = Settings(env="local", trail_enabled=False)
+        app.dependency_overrides[get_repository] = lambda: repo
+        app.dependency_overrides[get_queue_client] = lambda: fila
+        app.dependency_overrides[get_settings] = lambda: desligado
+        try:
+            with TestClient(app) as cliente:
+                assert cliente.get("/health").json()["trail_enabled"] is False
+        finally:
+            app.dependency_overrides.clear()

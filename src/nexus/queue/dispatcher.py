@@ -57,7 +57,7 @@ class OutboxDispatcher:
         self._repo = repository
         self._queue = queue
         self._settings = settings or get_settings()
-        self._trail = trail or TrailRecorder(repository, "dispatcher")
+        self._trail = trail or TrailRecorder(repository, "dispatcher", self._settings)
 
     def dispatch_once(self, *, limit: int | None = None) -> DispatchReport:
         """Publica ate ``limit`` eventos pendentes e devolve o relatorio."""

@@ -353,11 +353,11 @@ async def get_record(
 )
 async def list_records(
     repository: RepositoryDep,
+    settings: SettingsDep,
     record_type: Annotated[RecordType, Query(description="Tipo de registro")] = RecordType.PERSON,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
     cursor: Annotated[str | None, Query(max_length=2048)] = None,
 ) -> RecordPage:
-    settings = get_settings()
     page = await run_in_threadpool(
         repository.list_records,
         record_type,
@@ -371,8 +371,7 @@ async def list_records(
 
 
 @app.get("/health", response_model=HealthOut, summary="Verificacao de saude", tags=["ops"])
-async def health(repository: RepositoryDep, queue: QueueDep) -> HealthOut:
-    settings = get_settings()
+async def health(repository: RepositoryDep, queue: QueueDep, settings: SettingsDep) -> HealthOut:
     persistence_ok = await run_in_threadpool(repository.ping)
     return HealthOut(
         status="ok" if persistence_ok else "degraded",
@@ -380,6 +379,7 @@ async def health(repository: RepositoryDep, queue: QueueDep) -> HealthOut:
         version=__version__,
         persistence="ok" if persistence_ok else "unavailable",
         queue="enabled" if queue.is_enabled else "not_implemented",
+        trail_enabled=settings.trail_enabled,
     )
 
 
@@ -428,7 +428,7 @@ async def metrics(
 
     return {
         "scope": "in_process",
-        "environment": get_settings().env,
+        "environment": settings.env,
         "series_sampled": sample_written,
         "outbox_pending": backlog,
         # Profundidade da fila vem do armazenamento, nao de contadores em memoria:

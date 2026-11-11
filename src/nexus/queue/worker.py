@@ -63,7 +63,7 @@ class Worker:
         self._repo = repository
         self._queue = queue
         self._processor = processor or build_processor(self._settings, repository)
-        self._trail = trail or TrailRecorder(repository, "worker")
+        self._trail = trail or TrailRecorder(repository, "worker", self._settings)
 
     def process_once(self, *, max_messages: int | None = None) -> WorkerReport:
         """Consome um unico lote e termina."""

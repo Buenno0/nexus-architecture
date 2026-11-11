@@ -328,3 +328,53 @@ class TestObservabilidadeNaoDerrubaOObservado:
 
         recorder = TrailRecorder(RepositorioExplosivo(), "teste")
         recorder.marcar("rec-0", TrailStage.ACCEPTED)  # nao levanta
+
+
+class TestTrilhaDesligada:
+    """`trail_enabled=False` — o controle que a Fase 7 usa para medir o custo."""
+
+    def test_nao_grava_marco_nenhum(self, repo: FakeRepository) -> None:
+        servico = IngestionService(
+            repo,
+            RecordingQueueClient(enabled=True),
+            Settings(env="local", trail_enabled=False),
+        )
+        resultado = servico.ingest(
+            RecordType.PERSON,
+            PAYLOAD,
+            raw_body=json.dumps(PAYLOAD, sort_keys=True).encode(),
+            idempotency_key="k1",
+            correlation_id="corr",
+        )
+
+        assert resultado.status_code == 202
+        assert repo.get_trail(resultado.body["record_id"]) == []
+
+    def test_nao_toca_o_repositorio(self, repo: FakeRepository) -> None:
+        """Desligar precisa evitar a chamada, nao so descartar o resultado.
+
+        A economia que a Fase 7 vai medir esta na escrita que nao acontece; um
+        recorder que monta o evento e joga fora nao economizaria nada.
+        """
+
+        class RepositorioProibido(FakeRepository):
+            def record_trail(self, event: Any) -> bool:
+                raise AssertionError("record_trail nao deveria ser chamado")
+
+        recorder = TrailRecorder(
+            RepositorioProibido(), "teste", Settings(env="local", trail_enabled=False)
+        )
+        recorder.marcar("rec-0", TrailStage.ACCEPTED)
+
+    def test_o_processamento_segue_igual(
+        self, repo: FakeRepository, queue: SqliteQueue, worker_settings: Settings
+    ) -> None:
+        """Sem trilha o resultado do processamento nao muda — e o que torna a
+        comparacao A/B da Fase 7 valida."""
+        desligado = worker_settings.model_copy(update={"trail_enabled": False})
+        record_id = semear(repo, queue)
+        relatorio = Worker(repo, queue, DefaultProcessor(), desligado).process_once()
+
+        assert relatorio.processed == 1
+        assert record_id in repo.processed_ids
+        assert marcos(repo, record_id) == []

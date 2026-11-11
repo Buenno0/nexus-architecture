@@ -103,6 +103,17 @@ class Settings(BaseSettings):
     )
 
     # Observabilidade — Fase 6
+    #: Desliga a gravacao de marcos da trilha.
+    #:
+    #: Existe por duas razoes. A primeira e de medicao: a Fase 7 precisa comparar o
+    #: caminho de ingestao com e sem instrumentacao, senao o custo da trilha fica
+    #: diluido num numero que ninguem sabe atribuir. A segunda e operacional: a trilha
+    #: adiciona ate 6 escritas por registro, e sob pressao de custo desliga-la e a
+    #: primeira coisa que alguem vai querer fazer.
+    #:
+    #: Desligar nao degrada nenhuma garantia: a trilha e best-effort por decisao
+    #: (ADR-010). O que se perde e a capacidade de investigar, nao a correcao.
+    trail_enabled: bool = True
     trail_retention_days: int = Field(default=7, ge=1, le=90)
     series_retention_days: int = Field(default=7, ge=1, le=90)
     #: Intervalo do balde de amostragem. Define a densidade da serie.

@@ -25,9 +25,15 @@ ORIGEM_ESTRANHA = "https://site-malicioso.example"
 
 @pytest.fixture
 def client() -> Iterator[TestClient]:
-    app.dependency_overrides[get_repository] = FakeRepository
-    app.dependency_overrides[get_queue_client] = RecordingQueueClient
-    app.dependency_overrides[get_settings] = Settings
+    # Fabricas, nao classes. O FastAPI inspeciona a assinatura do que recebe e trata
+    # cada parametro como dependencia: passar `Settings` faz ele injetar os campos do
+    # modelo como parametros de consulta, e os que usam `default_factory` chegam como
+    # o sentinela interno do Pydantic. O erro ficou dormente ate a Fase 7, porque
+    # nenhuma rota exercitada aqui dependia de `get_settings` — e /health passou a
+    # depender.
+    app.dependency_overrides[get_repository] = lambda: FakeRepository()
+    app.dependency_overrides[get_queue_client] = lambda: RecordingQueueClient()
+    app.dependency_overrides[get_settings] = lambda: Settings()
     try:
         yield TestClient(app)
     finally:
