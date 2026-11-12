@@ -40,6 +40,19 @@ resource "aws_cognito_user_pool_client" "dashboard" {
   explicit_auth_flows = [
     "ALLOW_USER_SRP_AUTH",
     "ALLOW_REFRESH_TOKEN_AUTH",
+    # Exigido pelo painel, que autentica com InitiateAuth do SDK v3.
+    #
+    # Sem este flow o login responde "USER_PASSWORD_AUTH flow not enabled for this
+    # client" e o dashboard nunca entra. Era um defeito latente desde a Fase 4: o modo
+    # Cognito tinha teste de componente e nunca foi exercitado contra a AWS, e o
+    # relatorio daquela fase registrava isso como limitacao conhecida. Apareceu no
+    # primeiro deploy que tentou usa-lo.
+    #
+    # Troca aceita: SRP nao envia a senha, este flow envia (sob TLS). O SDK v3 nao
+    # implementa SRP — exigiria amazon-cognito-identity-js e mais bundle. Para uma
+    # conta de convidado cuja senha e publica por construcao, a diferenca e nenhuma;
+    # para um operador real, SRP seria preferivel.
+    "ALLOW_USER_PASSWORD_AUTH",
     # Fluxo iniciado por administrador: exige credenciais AWS com
     # cognito-idp:AdminInitiateAuth para ser usado, alem da senha do usuario. Nao e
     # superficie publica — serve para script de verificacao e automacao do operador.

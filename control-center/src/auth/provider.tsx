@@ -13,7 +13,15 @@
  * de manter em memoria e um login a cada recarga.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 
 import { config } from "../api/config";
@@ -97,6 +105,24 @@ export function AuthProvider({
       setEntrando(false);
     }
   }, []);
+
+  // Login automatico do convidado, em modo demonstracao.
+  //
+  // O visitante nao deveria ver tela de login para olhar um painel publico. A
+  // tentativa acontece UMA vez: sem a trava, uma credencial errada entraria em laco
+  // de autenticacao contra o Cognito, que cobra por usuario ativo e limita taxa.
+  // Falhando, o formulario aparece com o erro — degradar para o caminho manual e
+  // melhor que uma tela em branco tentando para sempre.
+  const tentouConvidado = useRef(false);
+  useEffect(() => {
+    if (modo !== "cognito" || sessao || tentouConvidado.current) return;
+    const { usuario, senha } = config.demoGuest;
+    if (!config.demoMode || !usuario || !senha) return;
+    tentouConvidado.current = true;
+    void entrar(usuario, senha).catch(() => {
+      // O erro ja esta no estado; aqui so evitamos uma rejeicao nao tratada.
+    });
+  }, [modo, sessao, entrar]);
 
   const sair = useCallback(() => {
     setSessao(null);

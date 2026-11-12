@@ -6,7 +6,26 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
-**Fase 9 — Demonstracao publica** *(codigo e infraestrutura como codigo; nada aplicado)*
+**Fase 9 — Demonstracao publica** *(infraestrutura aplicada em 12/11/2026)*
+
+- **Infraestrutura no ar**: 41 recursos criados. Verificado sem usar credencial nenhuma
+  — a ingestao livre responde `404` (a rota nao existe no gateway) e as demais rotas
+  `401` (existem e exigem token). A distincao entre os dois codigos e o que prova a
+  troca de roteamento.
+- **Login automatico do convidado** em modo demonstracao, com tentativa unica: sem a
+  trava, uma credencial errada entraria em laco de autenticacao contra o Cognito.
+- **Cold start medido** — item que a Fase 7 registrou como impossivel sem infraestrutura:
+  `api` 1.416 ms, `dispatcher` 732 ms, `worker` 573 ms, memoria entre 108 e 129 MB dos
+  512 alocados. **n=1 por funcao**, entao e observacao e nao medicao.
+
+### Corrigido
+
+- **`USER_PASSWORD_AUTH` nao estava habilitado no client do Cognito**, e o painel
+  autentica com esse flow. O login falharia com "flow not enabled for this client".
+  Defeito latente desde a Fase 4, cujo relatorio ja registrava que o modo Cognito nunca
+  fora exercitado contra a AWS — era exatamente isso que a lacuna escondia. Encontrado
+  sondando com uma senha deliberadamente errada, que distingue "flow desabilitado" de
+  "senha incorreta" sem usar a credencial real.
 
 - **`POST /v1/demo/seed`**: gera registros sinteticos **no servidor**, com teto por
   chamada e teto acumulado. O visitante escolhe quantos, nunca o que eles dizem.

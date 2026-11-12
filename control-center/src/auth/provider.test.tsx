@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthProvider, useAuth } from "./provider";
 import { Login } from "../screens/Login";
+import { config } from "../api/config";
 
 function Sonda() {
   const { autenticado, modo, usuario, sair } = useAuth();
@@ -107,5 +108,45 @@ describe("tela de login", () => {
       </AuthProvider>,
     );
     expect(screen.getByText(/exige autenticacao/)).toBeInTheDocument();
+  });
+});
+
+describe("login automatico do convidado", () => {
+  function comConvidado(usuario: string, senha: string, demo = true) {
+    // `config` e um objeto congelado lido do ambiente de build; em teste o que importa
+    // e o comportamento do provider diante dos valores, nao de onde eles vieram.
+    vi.spyOn(config, "demoMode", "get").mockReturnValue(demo);
+    vi.spyOn(config, "demoGuest", "get").mockReturnValue({ usuario, senha });
+  }
+
+  it("nao tenta entrar quando nao ha credencial de convidado", () => {
+    comConvidado("", "");
+    render(
+      <AuthProvider modo="cognito">
+        <Sonda />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId("autenticado")).toHaveTextContent("false");
+  });
+
+  it("nao tenta entrar fora do modo demonstracao", () => {
+    comConvidado("convidado", "senha", false);
+    render(
+      <AuthProvider modo="cognito">
+        <Sonda />
+      </AuthProvider>,
+    );
+    expect(screen.getByTestId("autenticado")).toHaveTextContent("false");
+  });
+
+  it("nao tenta entrar no modo none", () => {
+    comConvidado("convidado", "senha");
+    render(
+      <AuthProvider modo="none">
+        <Sonda />
+      </AuthProvider>,
+    );
+    // Autenticado por ser modo none, nao por ter feito login.
+    expect(screen.getByTestId("usuario")).toHaveTextContent("—");
   });
 });

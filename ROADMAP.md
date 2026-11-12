@@ -222,11 +222,14 @@ execucao sob demanda: **e** o modelo.
 
 ### Pendente — exige autorizacao e custa dinheiro
 
-- [ ] `terraform apply` — **nao executado**. Sem credenciais nesta maquina e sem
-      autorizacao
+- [x] `terraform apply` — **41 recursos criados em 12/11/2026**, com autorizacao
+      explicita. Verificado sem credencial: ingestao livre responde `404` (a rota nao
+      existe) e as demais `401` (existem e exigem token)
 - [ ] Deploy do Control Center na Vercel
-- [ ] Semear o acervo inicial para a demonstracao nao abrir vazia
-- [ ] Medir o cold start, que a Fase 7 nao pode quantificar
+- [x] Acervo inicial semeado: 300 registros, 231 processados, 45 entidades,
+      **10 pares aguardando decisao humana**
+- [x] Cold start medido: `api` 1.416 ms, `dispatcher` 732 ms, `worker` 573 ms.
+      **n=1 por funcao** — registrado como observacao, nao como medicao
 - [ ] Registrar o custo real depois de uma semana no ar
 
 ### Custo

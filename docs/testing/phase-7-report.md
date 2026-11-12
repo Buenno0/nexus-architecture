@@ -153,6 +153,9 @@ funcionou foi repetir a medicao e olhar a dispersao antes de olhar a diferenca.
 - **Nada foi medido na AWS.** A infraestrutura esta destruida. E a conta tem cota de 10
   execucoes concorrentes: qualquer vazao medida la seria a cota, nao a arquitetura.
 - **Cold start nao foi quantificado** — depende do item acima.
+  *(Atualizacao de 12/11/2026: medido na Fase 9, quando a infraestrutura voltou ao
+  ar. `api` 1.416 ms de init, `dispatcher` 732 ms, `worker` 573 ms. **Uma observacao
+  por funcao, n=1** — pela licao da secao 6 abaixo, isso nao e uma medicao.)*
 - **Os eixos de volume e concorrencia tem uma corrida por configuracao.** Os efeitos sao
   grandes o bastante para a tendencia ser confiavel; a magnitude, menos.
 - **O ambiente e um laptop com outros processos.** Os tetos de CPU controlam a disputa

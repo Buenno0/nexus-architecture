@@ -395,6 +395,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-009](docs/adr/ADR-009-control-center.md) — Todo numero declara de onde veio
   - [ADR-010](docs/adr/ADR-010-observabilidade.md) — Trilha durável, best-effort, por registro
 - [docs/runbook-deploy.md](docs/runbook-deploy.md) — procedimento de deploy e destruicao
+- [docs/runbook-demo.md](docs/runbook-demo.md) — procedimento da demonstracao publica
 
 ## Limitacoes conhecidas
 
