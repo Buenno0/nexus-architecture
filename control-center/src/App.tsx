@@ -27,8 +27,9 @@ type TelaId = (typeof TELAS)[number]["id"];
 export function App() {
   const [tela, setTela] = useState<TelaId>("overview");
   const { autenticado, modo, usuario, sair } = useAuth();
-  const health = useHealth();
-  const alertas = useAlerts();
+  const health = useHealth(autenticado);
+  // Depois da autenticacao: ver a docstring de useAlerts.
+  const alertas = useAlerts(autenticado);
 
   if (!autenticado) return <Login />;
 

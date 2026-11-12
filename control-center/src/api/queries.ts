@@ -58,10 +58,11 @@ export const chaves = {
   trail: (id: string) => ["observability", "trail", id] as const,
 };
 
-export function useHealth() {
+export function useHealth(habilitado = true) {
   return useQuery({
     queryKey: chaves.health,
     queryFn: () => request<Health>("/health"),
+    enabled: habilitado,
     ...polling,
   });
 }
@@ -230,10 +231,20 @@ export function ingerir(
  * Avaliados no servidor a partir do estado real a cada chamada. O navegador nao
  * decide nada: um limiar duplicado aqui divergiria do backend no primeiro ajuste.
  */
-export function useAlerts() {
+/**
+ * Alertas ativos.
+ *
+ * `habilitado` existe porque este hook e chamado no `App`, **antes** da barreira de
+ * autenticacao — hooks do React rodam incondicionalmente, entao sem a trava ele
+ * dispararia enquanto o token do convidado ainda nem existe. O resultado era uma
+ * sequencia de `401` no console e, com polling de 30s na demonstracao, ate meio minuto
+ * de painel vazio na primeira visita.
+ */
+export function useAlerts(habilitado = true) {
   return useQuery({
     queryKey: chaves.alerts,
     queryFn: () => request<Alerts>("/v1/observability/alerts"),
+    enabled: habilitado,
     ...polling,
   });
 }
