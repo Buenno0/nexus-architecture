@@ -10,6 +10,44 @@ processados de forma assincrona, correlacionados e monitorados.
 
 **Todos os dados sao sinteticos.** Nenhum dado pessoal real e utilizado em qualquer etapa.
 
+```mermaid
+flowchart LR
+    G["Fontes<br/>sinteticas"] --> A["Ingestion<br/><small>valida · idempotencia<br/>transacao atomica</small>"]
+    A --> D[("DynamoDB<br/>single-table")]
+    A -.->|"best-effort"| Q[["Fila"]]
+    D -->|"outbox, indice esparso"| Q
+    Q --> W["Worker<br/><small>retry · backoff · DLQ</small>"]
+    W --> R["Entity Resolution<br/><small>blocking · score auditavel</small>"]
+    R --> D
+```
+
+## Por onde comecar
+
+Tres coisas, em ordem de interesse. Nenhuma delas e a lista de endpoints.
+
+**1. Onde eu errei.** A parte mais util do projeto e a
+[secao 6 do relatorio da Fase 7](docs/testing/phase-7-report.md): quatro erros meus de
+medicao, dois deles com o sinal invertido — a mesma configuracao reportada como melhor
+e como pior em corridas diferentes. O antidoto que funcionou foi repetir a medicao e
+olhar a dispersao **antes** de olhar a diferenca. As corridas inconclusivas continuam
+versionadas de proposito: apagar a evidencia tornaria a explicacao impossivel de
+verificar.
+
+**2. Por que cada mecanismo caro existe.** Outbox transacional, fila propria, trilha
+durável e single-table sao decisoes desproporcionais ao volume medido, e cada uma tem um
+[ADR](docs/adr/README.md) dizendo que problema resolve, o que foi recusado e o que
+custa. O ADR-003 mantem no texto um argumento meu que estava errado, marcado como
+errado.
+
+**3. O que o sistema faz.** `./scripts/demo.sh` executa onze atos, da pilha subindo ate
+um alerta acendendo e apagando — e **falha** quando o estado nao corresponde ao que
+narra. Os [diagramas](docs/architecture/diagramas.md) cobrem o resto.
+
+Limitacoes, agrupadas por causa e separando as ja vencidas das atuais:
+[docs/testing/README.md](docs/testing/README.md). **Nenhuma capacidade nao implementada
+e declarada em lugar nenhum deste repositorio** — quando um numero nao existe, esta
+escrito que nao existe.
+
 ---
 
 ## Estado atual
