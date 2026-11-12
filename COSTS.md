@@ -191,6 +191,35 @@ de US$ 1,00 — cerca de US$ 0,57 de DynamoDB para 50 mil registros com trilha, 
 dentro da franquia. Fica para quando houver outra razao para subir a infraestrutura; a
 tabela de "Quanto custa um teste de carga" acima continua valendo como estimativa.
 
+## Custo da Fase 8 — integracao continua
+
+**US$ 0,00 hoje**, porque o pipeline nunca executou: o repositorio e local.
+
+Quando for publicado, o custo depende da visibilidade, e a diferenca nao e pequena:
+
+| Visibilidade | Minutos de GitHub Actions | Custo |
+|---|---|---|
+| Publico | ilimitados em runners padrao | **US$ 0,00** |
+| Privado | 2.000 min/mes na conta gratuita | US$ 0,008/min depois disso |
+
+Uma execucao completa do pipeline consome os quatro jobs em paralelo. A suite Python
+leva cerca de um minuto nesta maquina; somando instalacao de dependencias, subida do
+DynamoDB e o Control Center, a estimativa e de **4 a 8 minutos de runner por push**.
+
+Num repositorio privado com 2.000 minutos, isso da ordem de **250 a 500 execucoes por
+mes** dentro da franquia — folgado para um projeto de uma pessoa, apertado se o
+pipeline rodar em cada commit de um branch movimentado.
+
+**Nenhum job do CI toca na AWS.** Nao ha credencial no pipeline, `terraform validate`
+roda com `-backend=false` e nenhum recurso e criado. O custo de CI nao pode virar custo
+de nuvem por acidente — e essa e a razao de a configuracao ser assim, nao so a
+seguranca.
+
+> Se algum dia o CI precisar de credenciais da AWS — para um teste de integracao real,
+> por exemplo —, a conta de custo muda de natureza: passa a existir um caminho em que
+> um push cria recurso. Isso exigiria OIDC em vez de chave estatica, um papel com
+> permissao minima, e autorizacao explicita. Nao e o caso hoje.
+
 ## Armadilhas identificadas
 
 Servicos que cobram **mesmo sem uso**:

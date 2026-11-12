@@ -1,0 +1,160 @@
+# Integracao continua — Fase 8.
+#
+# Tres principios, cada um resposta a um defeito concreto que este projeto encontrou:
+#
+# 1. **O CI roda a suite inteira, incluindo integracao.** Os testes de integracao sao
+#    os unicos que exercitam `TransactWriteItems`, indice esparso e escrita condicional
+#    contra o DynamoDB de verdade. Um CI que roda so os unitarios verifica a logica e
+#    deixa passar exatamente a classe de defeito que motivou o projeto.
+#
+# 2. **O banco sobe pelo mesmo `docker-compose.yml` do desenvolvimento**, nao por um
+#    `services:` do GitHub Actions. O `services:` nao permite sobrescrever o comando do
+#    container, e o DynamoDB Local sem `-sharedDb` abre uma base por combinacao de
+#    credencial e regiao. O CI mediria outro banco, e a divergencia so apareceria quando
+#    alguem confiasse nele.
+#
+# 3. **Nada aqui toca na AWS.** Nenhum job recebe credencial, nenhum aplica Terraform.
+#    `terraform validate` roda com `-backend=false`, que nao autentica e nao cria nada.
+#
+# As versoes das acoes estao presas em tag maior. Nao e o ideal — uma tag e movel, e
+# quem controla o repositorio da acao controla o que roda aqui. Sem segredo no pipeline
+# e sem acesso a nuvem, a exposicao e limitada; com credenciais, o SHA passaria a ser
+# obrigatorio.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Uma execucao por referencia: push sobre push cancela a anterior em vez de enfileirar.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Credenciais falsas exigidas pelo SDK para falar com o DynamoDB Local.
+  # Nao sao segredos — ver SECURITY.md.
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+  AWS_DEFAULT_REGION: us-east-1
+
+jobs:
+  qualidade:
+    name: Lint e tipos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias
+        run: uv sync --frozen
+
+      - name: ruff check
+        run: uv run ruff check .
+
+      - name: ruff format
+        run: uv run ruff format --check .
+
+      - name: mypy strict
+        run: uv run mypy
+
+  testes-python:
+    name: Testes Python
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Instalar dependencias
+        run: uv sync --frozen
+
+      - name: Subir o DynamoDB Local
+        run: docker compose up -d --wait dynamodb
+
+      - name: Suite completa
+        # NEXUS_TEST_REQUIRE_DYNAMO transforma "DynamoDB indisponivel" de teste pulado
+        # em falha. Sem isso um banco que nao sobe deixa o pipeline verde.
+        env:
+          NEXUS_TEST_REQUIRE_DYNAMO: "1"
+          NEXUS_TEST_DYNAMO_ENDPOINT: http://localhost:8000
+        run: uv run pytest --cov=src/nexus --cov-report=term-missing --cov-report=xml
+
+      - name: Diagnostico do banco em caso de falha
+        if: failure()
+        run: docker compose logs dynamodb
+
+      - name: Derrubar o DynamoDB Local
+        if: always()
+        run: docker compose down -v
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cobertura-python
+          path: coverage.xml
+          if-no-files-found: warn
+
+  control-center:
+    name: Control Center
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: control-center
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: control-center/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tipos
+        run: npx tsc --noEmit
+
+      - name: eslint
+        run: npm run lint
+
+      - name: Testes
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+
+  infraestrutura:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Formatacao
+        run: terraform fmt -check -recursive
+        working-directory: infra/terraform
+
+      - name: Validacao
+        # -backend=false nao autentica, nao le estado e nao cria nada. O job existe
+        # para impedir que o Terraform versionado apodreca enquanto a infraestrutura
+        # esta destruida — nao para implantar.
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+        working-directory: infra/terraform

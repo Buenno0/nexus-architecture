@@ -21,6 +21,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
 | Performance Engineering | 7 | Medido localmente — gargalo identificado; nuvem pendente |
+| Finalizacao | 8 | Diagramas, ADRs consolidados, demonstracao roteirizada, CI **escrito e nao executado** |
 
 A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
 validada ponta a ponta; em 09/11 foi **destruida**, deixando a conta limpa. Custo real
@@ -48,6 +49,23 @@ make lint                # ruff + mypy strict
 
 A API fica disponivel em `http://localhost:8080`.
 Documentacao interativa (OpenAPI) em `http://localhost:8080/docs`.
+
+## Demonstracao em um comando
+
+Para ver a plataforma inteira funcionando sem conhecer nenhum endpoint:
+
+```bash
+./scripts/demo.sh
+```
+
+Onze atos: sobe a pilha, ingere registros sinteticos, despacha o outbox, consome a fila,
+mostra a jornada de um registro **atravessando dois processos**, exibe a resolucao de
+identidade, injeta falha ate a DLQ, mostra o alerta acendendo, faz redrive e mostra o
+alerta apagando.
+
+Roteirizada, nao gravada. Um video envelhece em silencio; este script falha na etapa
+exata que parar de funcionar. Use `--pausar` para acompanhar ato a ato e `--help` para
+as demais opcoes.
 
 ## Endpoints (Fase 1)
 
@@ -243,6 +261,25 @@ O joelho da curva esta entre 10 e 50 usuarios simultaneos.
 
 ---
 
+## Integracao continua (Fase 8)
+
+`.github/workflows/ci.yml` roda, a cada push e pull request: `ruff`, `mypy --strict`, a
+suite Python **inteira** (incluindo os testes de integracao, contra DynamoDB Local
+subido pelo mesmo `docker-compose.yml` do desenvolvimento), tipos, lint, testes e build
+do Control Center, e `terraform validate` com `-backend=false`.
+
+> **O pipeline nunca executou.** Este repositorio e local, sem remote: ate ser publicado
+> no GitHub, o workflow e um arquivo com intencao. Os comandos que ele roda foram
+> verificados manualmente nesta maquina, o que nao e a mesma coisa.
+
+Nenhum job recebe credencial da AWS e nenhum cria recurso.
+
+Os mesmos comandos, a mao:
+
+```bash
+make lint && make test && make dashboard-check
+```
+
 ## Dados sinteticos
 
 ```bash
@@ -257,16 +294,19 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - [COSTS.md](COSTS.md) — estimativas e armadilhas de custo AWS
 - [SECURITY.md](SECURITY.md) — postura de seguranca
 - [CHANGELOG.md](CHANGELOG.md) — historico de mudancas
+- [docs/architecture/diagramas.md](docs/architecture/diagramas.md) — diagramas da arquitetura
 - [docs/architecture/access-patterns.md](docs/architecture/access-patterns.md) — modelagem DynamoDB
+- [docs/testing/README.md](docs/testing/README.md) — **relatorio consolidado e limitacoes atuais**
 - [docs/testing/phase-1-report.md](docs/testing/phase-1-report.md) — testes da Fase 1
 - [docs/testing/phase-2-report.md](docs/testing/phase-2-report.md) — testes da Fase 2
 - [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) — testes da Fase 4
 - [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) — testes e qualidade da Fase 5
 - [docs/testing/phase-6-report.md](docs/testing/phase-6-report.md) — testes da Fase 6
 - [docs/testing/phase-7-report.md](docs/testing/phase-7-report.md) — medicoes da Fase 7
+- [docs/testing/phase-8-report.md](docs/testing/phase-8-report.md) — verificacao da Fase 8
 - [docs/performance/metodologia.md](docs/performance/metodologia.md) — como as medicoes foram feitas
 - [docs/performance/](docs/performance/) — medicoes
-- [docs/adr/](docs/adr/) — registros de decisao arquitetural
+- [docs/adr/README.md](docs/adr/README.md) — **indice dos ADRs, com as decisoes superadas marcadas**
   - [ADR-001](docs/adr/ADR-001-dynamodb-local.md) — DynamoDB Local em vez de PostgreSQL
   - [ADR-002](docs/adr/ADR-002-identidade-e-idempotencia.md) — Operacao, conteudo e entidade
   - [ADR-003](docs/adr/ADR-003-transactional-outbox.md) — Transactional outbox com GSI esparso
@@ -288,7 +328,6 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **As metricas de qualidade da resolucao valem para dados sinteticos.** Dados reais
   trazem sujeira que o gerador nao imita.
 - **Pesos e limiares de correspondencia sao parametros calibrados**, nao verdades.
-- **Nao ha interface de revisao**, apenas endpoints. A tela e escopo da Fase 4.
 - **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
   culpada, mas reverte-la e manual.
 - **O comportamento sob carga na AWS nao foi medido.** A Fase 7 mediu localmente; a
@@ -313,6 +352,9 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - Nenhum recurso de nuvem foi provisionado; nenhuma medicao local vale como previsao
   de desempenho ou custo na AWS.
 
-Lista completa em [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md).
+- **O CI nunca executou**, porque o repositorio ainda nao foi publicado.
+
+Lista completa, agrupada por causa e com as limitacoes ja vencidas separadas das que
+continuam valendo: [docs/testing/README.md](docs/testing/README.md).
 
 Este projeto e experimental e **nao** deve ser tratado como sistema de producao.

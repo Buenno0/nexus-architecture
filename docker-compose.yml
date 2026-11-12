@@ -57,6 +57,18 @@ services:
       - "8080:8080"
     volumes:
       - queue-data:/data
+    # Sem healthcheck, 'docker compose up --wait' devolve assim que o container esta
+    # *rodando* — e o uvicorn ainda nao abriu a porta. Quem chamasse a API logo em
+    # seguida levaria connection reset, de forma intermitente e dificil de atribuir.
+    # Encontrado ao executar scripts/demo.sh pela primeira vez. Fase 8.
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3).status == 200 else 1)"
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
     cpus: ${NEXUS_API_CPUS:-2.0}
     mem_limit: ${NEXUS_API_MEM:-2g}
     command:

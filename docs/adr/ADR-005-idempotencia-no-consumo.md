@@ -1,7 +1,10 @@
 # ADR-005 — Idempotencia no consumo: o marcador e o resultado
 
-- **Status:** Aceita
+- **Status:** Aceita — **emendada pelo [ADR-007](ADR-007-versionamento-do-processador.md)**
 - **Data:** 2026-11-06
+- **Emenda:** o marcador que garante idempotencia tambem impedia reprocessar o acervo
+  sob um processador melhor. O ADR-007 o versiona para resolver isso, sem revogar nada
+  do que esta decidido abaixo.
 
 ## Contexto
 

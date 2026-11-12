@@ -169,12 +169,29 @@ conteudo da fase e nao um apendice constrangedor.
 
 ---
 
-## Fase 8 — Finalizacao
+## Fase 8 — Finalizacao  *(concluida, exceto a execucao do CI)*
 
-- [ ] Documentacao tecnica completa
-- [ ] Diagramas de arquitetura
-- [ ] README final
-- [ ] ADRs consolidados
-- [ ] CI/CD
-- [ ] Demonstracao funcional
-- [ ] Documentacao explicita de limitacoes
+- [x] **Diagramas de arquitetura** em Mermaid, versionados em
+      [docs/architecture/diagramas.md](docs/architecture/diagramas.md): modulos,
+      ingestao, outbox esparso, ciclo de vida da mensagem, trilha entre processos,
+      modelo single-table e a infraestrutura AWS (marcada como destruida no titulo)
+- [x] **ADRs consolidados** em [docs/adr/README.md](docs/adr/README.md), com as tres
+      decisoes de alcance alterado marcadas no proprio cabecalho: 005 emendada pela
+      007, 009 parcialmente superada pela 010, 008 implantada e destruida
+- [x] **Demonstracao reproduzivel** (`scripts/demo.sh`): onze atos, roteirizada e
+      executavel, que **falha** quando o estado nao corresponde a narracao
+- [x] **README final**, com a demonstracao em um comando
+- [x] **Relatorio consolidado** em [docs/testing/README.md](docs/testing/README.md),
+      separando limitacoes vencidas das que continuam valendo
+- [x] **Limitacoes agrupadas por causa**, distinguindo troca deliberada de pendencia
+- [x] CI escrito: `.github/workflows/ci.yml` — ruff, mypy, suite Python completa com
+      DynamoDB real, Control Center e `terraform validate`
+- [ ] **CI executando a cada push** — depende de publicar o repositorio no GitHub.
+      Enquanto isso nao acontecer, o workflow e um arquivo que nunca rodou
+- [ ] Documentacao publicada em `docs.nexus.mateus-bueno.dev` — exige DNS e hospedagem,
+      fora de escopo por decisao
+
+Dois defeitos foram encontrados **executando** o roteiro, nao escrevendo-o: o servico
+`api` nao tinha healthcheck, entao `docker compose up --wait` devolvia antes de a porta
+abrir; e o laco de injecao de falha esperava um tempo fixo que o backoff exponencial
+ultrapassava, de modo que os atos do alerta narravam um alarme que nunca acendeu.

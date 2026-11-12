@@ -1,7 +1,12 @@
 # ADR-009 — Todo numero declara de onde veio
 
-- **Status:** Aceita
+- **Status:** Aceita — **parcialmente superada pelo [ADR-010](ADR-010-observabilidade.md)**
 - **Data:** 2026-11-09
+- **Emenda:** o principio de rotular a origem de todo numero continua valendo integralmente.
+  O que mudou foi um caso concreto: a janela deslizante deixou de ser acumulada na aba e
+  passou a vir do armazenamento, entao os graficos de profundidade mostram `persistido`
+  onde este ADR previa `sessao`. A limitacao que ele aceitava — recarregar a pagina zera
+  o historico — deixou de existir para essas series.
 
 ## Contexto
 

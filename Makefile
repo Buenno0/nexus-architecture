@@ -1,7 +1,7 @@
 .PHONY: help up down logs test test-unit test-int lint fmt generate table clean \
         dispatch process drain queue-stats redrive pipeline reprocess resolution \
         reviews fail-test lambda tf-validate tf-plan dashboard dashboard-build \
-        dashboard-test dashboard-check
+        dashboard-test dashboard-check demo ci
 
 PY := .venv/bin/python
 N  ?= 100
@@ -105,6 +105,15 @@ load:      ## Uma corrida de carga (make load NOME=exp USUARIOS=50 DURACAO=60s)
 
 campaign:  ## Campanha completa da Fase 7 (DESTRUTIVO: zera os dados entre corridas)
 	$(PY) tools/campanha.py --tudo
+
+demo:      ## Demonstracao roteirizada ponta a ponta (make demo ARGS=--pausar)
+	./scripts/demo.sh $(ARGS)
+
+ci:        ## Os mesmos comandos que o pipeline roda, nesta maquina
+	$(MAKE) lint
+	docker compose up -d --wait dynamodb
+	NEXUS_TEST_REQUIRE_DYNAMO=1 .venv/bin/pytest --cov=src/nexus --cov-report=term-missing
+	$(MAKE) dashboard-check
 
 clean:     ## Remove containers e volumes (DESTRUTIVO: apaga os dados locais)
 	docker compose down -v

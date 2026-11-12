@@ -6,6 +6,45 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 8 — Finalizacao**
+
+- **Integracao continua** (`.github/workflows/ci.yml`): ruff, `mypy --strict`, a suite
+  Python **inteira** com DynamoDB Local subido pelo mesmo `docker-compose.yml` do
+  desenvolvimento, tipos/lint/testes/build do Control Center e `terraform validate` com
+  `-backend=false`. Nenhum job recebe credencial da AWS.
+  **O pipeline nunca executou:** o repositorio e local, sem remote.
+- `NEXUS_TEST_REQUIRE_DYNAMO`, que transforma "DynamoDB indisponivel" de teste pulado em
+  falha. Sem isso, um banco que nao sobe no CI deixaria a suite de integracao inteira
+  pular em silencio e o pipeline verde.
+- **Diagramas em Mermaid** (`docs/architecture/diagramas.md`): modulos, fluxo de
+  ingestao, indice esparso do outbox, ciclo de vida da mensagem, trilha atravessando
+  processos, modelo single-table e infraestrutura AWS. Texto, nao imagem, para que o
+  diff mostre qual seta mudou.
+- **Indice dos ADRs** (`docs/adr/README.md`) com as decisoes de alcance alterado
+  marcadas no proprio cabecalho de cada documento.
+- **Demonstracao roteirizada** (`scripts/demo.sh`): onze atos da pilha subindo ate o
+  alerta apagando, com asserts que **quebram** quando o estado nao corresponde ao que o
+  roteiro narra.
+- **Relatorio consolidado** (`docs/testing/README.md`), separando as limitacoes ja
+  vencidas das atuais e agrupando as atuais por causa.
+- Healthcheck do servico `api` no `docker-compose.yml`.
+
+### Corrigido
+
+- **`docker compose up --wait` devolvia antes de a API aceitar conexao.** O servico
+  `api` nao tinha healthcheck, entao `--wait` considerava pronto um container que ainda
+  nao abrira a porta; a primeira chamada seguinte levava connection reset de forma
+  intermitente. Encontrado ao executar `scripts/demo.sh` pela primeira vez.
+- **O caminho de falha do roteiro esperava tempo fixo**, e o backoff exponencial entre
+  entregas o ultrapassava: a DLQ ficava vazia e os dois atos seguintes narravam um
+  alerta que nunca acendeu. O roteiro agora observa o estado e falha quando ele nao
+  corresponde.
+
+### Alterado
+
+- Limitacao vencida removida do README: a tela de revisao de pares existe desde a
+  Fase 4, mas a lista ainda dizia "nao ha interface de revisao, apenas endpoints".
+
 **Fase 7 — Performance Engineering**
 
 - **Arnes de carga** (`tools/loadtest.py`) que registra, alem da latencia, o delta dos

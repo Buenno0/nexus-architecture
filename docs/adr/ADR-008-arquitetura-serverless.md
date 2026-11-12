@@ -1,7 +1,11 @@
 # ADR-008 — Arquitetura serverless na AWS
 
-- **Status:** Aceita (implementada, **nao implantada**)
+- **Status:** Aceita — **implementada, validada na AWS e destruida**
 - **Data:** 2026-11-07
+- **Situacao em 2026-11-12:** nenhum recurso existe. A infraestrutura foi aplicada,
+  verificada ponta a ponta e destruida na Fase 3; o Terraform permanece versionado em
+  `infra/terraform/`. Custo acumulado do projeto: US$ 0,00. Ver
+  [phase-3-report.md](../testing/phase-3-report.md).
 
 ## Contexto
 

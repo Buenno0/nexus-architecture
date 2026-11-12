@@ -4,7 +4,7 @@ Documento de planejamento das Fases 3 a 8. Complementa o [ROADMAP.md](ROADMAP.md
 lista os itens; aqui estao o contexto, as decisoes ja tomadas que delimitam cada fase,
 as decisoes ainda em aberto e os criterios de aceite.
 
-Ultima atualizacao: 2026-11-10, ao concluir a Fase 6.
+Ultima atualizacao: 2026-11-12, ao concluir a Fase 8.
 
 > As Fases 4, 5 e 6 ja foram concluidas — a 5 fora da ordem numerica, por nao depender
 > da nuvem. O planejamento delas permanece abaixo como registro do que se previa; os
@@ -24,11 +24,11 @@ Ultima atualizacao: 2026-11-10, ao concluir a Fase 6.
 | 1 | Nexus Ingestion | **Concluida** |
 | 2 | Nexus Queue Engine | **Concluida** |
 | 3 | Cloud Infrastructure | **Construida, nao implantada** |
-| 4 | Nexus Control Center | Nao iniciada |
+| 4 | Nexus Control Center | **Concluida** |
 | 5 | Nexus Entity Resolution | **Concluida** |
-| 6 | Nexus Observability | Parcial |
-| 7 | Performance Engineering | Nao iniciada |
-| 8 | Finalizacao | Nao iniciada |
+| 6 | Nexus Observability | **Concluida** |
+| 7 | Performance Engineering | **Concluida** (local; nuvem recusada por cota) |
+| 8 | Finalizacao | **Concluida**, exceto a execucao do CI |
 
 **Entregue ate aqui:** API de ingestao com validacao, normalizacao e idempotencia por
 operacao; transactional outbox com indice esparso; fila local com visibility timeout,
@@ -360,7 +360,21 @@ apenas o caminho mais caro e esconde quanto replay e deduplicacao custam.
 
 ---
 
-## Fase 8 — Finalizacao
+## Fase 8 — Finalizacao  *(concluida em 12/11/2026)*
+
+> O que foi realmente entregue esta em
+> [docs/testing/README.md](docs/testing/README.md), que consolida os sete relatorios de
+> fase. Duas diferencas em relacao ao planejado abaixo:
+>
+> - **O CI esta escrito e nunca executou.** O repositorio e local, sem remote. Publicar
+>   no GitHub e decisao do autor, nao da fase.
+> - **`docs.nexus.mateus-bueno.dev` ficou fora de escopo.** Exige DNS e hospedagem; a
+>   documentacao vive no repositorio, em Markdown que o GitHub renderiza, incluindo os
+>   diagramas Mermaid.
+>
+> A demonstracao e **roteirizada e executavel** (`scripts/demo.sh`), nao gravada. Um
+> video envelhece em silencio; um script falha na etapa que parar de funcionar — e
+> falhou duas vezes antes de ficar pronto, revelando dois defeitos reais.
 
 ### Objetivo
 
