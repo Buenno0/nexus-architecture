@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml/badge.svg)](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml)
 
+**Demonstracao ao vivo:** https://nexus-architecture-buenno.vercel.app — sem login, dados sinteticos, lendo o DynamoDB real.
+
 > Engineering distributed systems, one component at a time.
 
 Plataforma experimental de engenharia de sistemas distribuidos. Demonstra como dados
@@ -62,6 +64,7 @@ escrito que nao existe.
 | Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
 | Performance Engineering | 7 | Medido localmente — gargalo identificado; nuvem pendente |
 | Finalizacao | 8 | Diagramas, ADRs consolidados, demonstracao roteirizada, **CI verde no GitHub Actions** |
+| Demonstracao publica | 9 | **No ar na AWS** — tres defeitos de infraestrutura corrigidos no caminho |
 
 [^1]: Precisao 1,0000 e recall 1,0000 sobre 500 registros com variacoes que **eu mesmo
     gerei**: abreviacao, erro de digitacao, troca de provedor, campo omitido. O gabarito
@@ -396,6 +399,7 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   - [ADR-010](docs/adr/ADR-010-observabilidade.md) — Trilha durável, best-effort, por registro
 - [docs/runbook-deploy.md](docs/runbook-deploy.md) — procedimento de deploy e destruicao
 - [docs/runbook-demo.md](docs/runbook-demo.md) — procedimento da demonstracao publica
+- [docs/testing/phase-9-report.md](docs/testing/phase-9-report.md) — verificacao da Fase 9
 
 ## Limitacoes conhecidas
 

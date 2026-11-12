@@ -23,6 +23,7 @@ Ultima atualizacao: 2026-11-12, ao concluir a Fase 8.
 | 6 | Observability | [phase-6-report.md](phase-6-report.md) | Trilha durável que atravessa processos, serie persistida, alertas calculados |
 | 7 | Performance | [phase-7-report.md](phase-7-report.md) | Gargalo identificado com evidencia — e quatro erros de medicao corrigidos |
 | 8 | Finalizacao | [phase-8-report.md](phase-8-report.md) | A documentacao faz o que promete — verificado executando-a, e ela falhou duas vezes antes |
+| 9 | Demonstracao publica | [phase-9-report.md](phase-9-report.md) | A plataforma no ar — e tres defeitos de infraestrutura que so o caminho real revelaria |
 
 Metodologia e corridas de carga: [docs/performance/](../performance/).
 

@@ -200,7 +200,9 @@ ultrapassava, de modo que os atos do alerta narravam um alarme que nunca acendeu
 
 ---
 
-## Fase 9 — Demonstracao publica  *(em andamento)*
+## Fase 9 — Demonstracao publica  *(concluida em 12/11/2026)*
+
+**https://nexus-architecture-buenno.vercel.app**
 
 Objetivo: um endereco que um interessado abre e **usa**, em vez de ler. A arquitetura
 favorece isso de um jeito que poucas favorecem — nada processa sozinho, entao o
@@ -225,12 +227,16 @@ execucao sob demanda: **e** o modelo.
 - [x] `terraform apply` — **41 recursos criados em 12/11/2026**, com autorizacao
       explicita. Verificado sem credencial: ingestao livre responde `404` (a rota nao
       existe) e as demais `401` (existem e exigem token)
-- [ ] Deploy do Control Center na Vercel
+- [x] Control Center publicado na Vercel, com login automatico de convidado
+- [x] **Tres defeitos de infraestrutura corrigidos**, nenhum introduzido nesta fase:
+      `USER_PASSWORD_AUTH` ausente no Cognito, `/v1/observability/*` fora do gateway,
+      e `ANY` no `route_key` reprovando o preflight de CORS
 - [x] Acervo inicial semeado: 300 registros, 231 processados, 45 entidades,
       **10 pares aguardando decisao humana**
 - [x] Cold start medido: `api` 1.416 ms, `dispatcher` 732 ms, `worker` 573 ms.
       **n=1 por funcao** — registrado como observacao, nao como medicao
-- [ ] Registrar o custo real depois de uma semana no ar
+- [ ] Registrar o custo real — o Cost Explorer leva ate 24h, e a tag de alocacao so
+      vale para uso posterior a ativacao
 
 ### Custo
 
