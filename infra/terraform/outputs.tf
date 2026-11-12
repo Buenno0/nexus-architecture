@@ -43,3 +43,20 @@ output "estimated_monthly_cost_usd" {
   EOT
   value       = "~0.10 (DynamoDB On-Demand; demais servicos dentro da franquia)"
 }
+
+output "demo_mode" {
+  description = "Se true, a ingestao livre NAO esta roteada e a entrada e POST /v1/demo/seed."
+  value       = var.demo_mode
+}
+
+output "demo_limits" {
+  description = "Tetos aplicados no servidor. A interface nao limita nada: a credencial de convidado e publica."
+  value = var.demo_mode ? {
+    max_per_call = var.demo_max_per_call
+    max_total    = var.demo_max_total
+    pior_caso_usd = format(
+      "~%.2f",
+      var.demo_max_total * 12 * 0.625 / 1000000
+    )
+  } : null
+}

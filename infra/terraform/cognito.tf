@@ -58,3 +58,38 @@ resource "aws_cognito_user_pool_client" "dashboard" {
 
   prevent_user_existence_errors = "ENABLED"
 }
+
+# ---------------------------------------------------------------- demonstracao
+
+# Convidado da demonstracao publica.
+#
+# A senha deste usuario viaja no bundle JavaScript, para que o visitante nao veja tela
+# de login. Isso nao e descuido: uma SPA nao guarda segredo, como o comentario no topo
+# deste arquivo ja dizia, e fingir o contrario seria pior do que assumir.
+#
+# A consequencia precisa ser levada a serio: qualquer pessoa extrai o token e chama a
+# API direto, sem passar pela interface. Portanto **a interface nao e uma protecao**.
+# O que protege e, nesta ordem:
+#
+#   1. As rotas de ingestao livre nao existem no roteamento (apigateway.tf).
+#   2. Os tetos por chamada e acumulado sao avaliados no servidor.
+#   3. O throttle do stage limita a taxa.
+#   4. O convidado nao recebe nenhuma credencial da AWS — apenas um JWT que o
+#      API Gateway aceita. Nao ha identity pool, entao nao ha acesso a servicos.
+resource "aws_cognito_user" "guest" {
+  count = var.demo_mode ? 1 : 0
+
+  user_pool_id = aws_cognito_user_pool.main.id
+  username     = var.demo_guest_username
+  password     = var.demo_guest_password
+
+  # Sem e-mail e sem convite: este usuario nao pertence a ninguem.
+  message_action = "SUPPRESS"
+
+  lifecycle {
+    precondition {
+      condition     = length(var.demo_guest_password) >= 12
+      error_message = "demo_mode exige demo_guest_password com no minimo 12 caracteres (politica do pool: maiuscula, minuscula, numero e simbolo)."
+    }
+  }
+}

@@ -47,6 +47,11 @@ services:
       NEXUS_FAILURE_INJECTION_RATE: ${NEXUS_FAILURE_INJECTION_RATE:-0.0}
       # Desliga a gravacao da trilha — ADR-010. A Fase 7 compara os dois lados.
       NEXUS_TRAIL_ENABLED: ${NEXUS_TRAIL_ENABLED:-true}
+      # Demonstracao publica — Fase 9. Fora do modo demo a rota /v1/demo/seed nao
+      # existe e a ingestao livre continua disponivel, como no desenvolvimento normal.
+      NEXUS_DEMO_MODE: ${NEXUS_DEMO_MODE:-false}
+      NEXUS_DEMO_MAX_PER_CALL: ${NEXUS_DEMO_MAX_PER_CALL:-200}
+      NEXUS_DEMO_MAX_TOTAL: ${NEXUS_DEMO_MAX_TOTAL:-5000}
       # Pool de conexoes do cliente DynamoDB. Padrao do botocore e 10 — Fase 7.
       NEXUS_DYNAMO_MAX_POOL_CONNECTIONS: ${NEXUS_DYNAMO_MAX_POOL_CONNECTIONS:-10}
       # Credenciais falsas exigidas pelo SDK para falar com o DynamoDB Local.

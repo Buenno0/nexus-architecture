@@ -17,6 +17,8 @@ import {
   useReprocess,
 } from "../api/queries";
 import { enviarLote, montarLote } from "../api/generator";
+import { config } from "../api/config";
+import { semear } from "../api/queries";
 import type { ProgressoGeracao } from "../api/generator";
 import { somarPorNome } from "../metrics/parse";
 import { descreverCobertura, paraPontos } from "../metrics/persisted";
@@ -61,8 +63,21 @@ export function QueueMonitoring() {
 
   async function gerar(quantidade: number) {
     setProgresso({ enviados: 0, aceitos: 0, duplicados: 0, falhas: 0, total: quantidade });
-    const lote = montarLote(quantidade, "control-center", 0.15, 0.25);
-    const final = await enviarLote(lote, setProgresso);
+
+    // Em modo demonstracao quem gera e o servidor: a ingestao livre nao esta exposta.
+    // Nao ha progresso parcial para mostrar, porque e uma unica chamada — o painel
+    // salta de zero ao resultado, e dizer isso e melhor que simular uma barra.
+    const final = config.demoMode
+      ? await semear(quantidade).then((r) => ({
+          enviados: r.requested,
+          aceitos: r.accepted,
+          duplicados: r.duplicate,
+          falhas: r.failed,
+          total: r.requested,
+        }))
+      : await enviarLote(montarLote(quantidade, "control-center", 0.15, 0.25), setProgresso);
+
+    setProgresso(final);
     guardar(final);
     void queue.refetch();
     void metrics.refetch();

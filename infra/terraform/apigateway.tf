@@ -43,16 +43,36 @@ locals {
   }
 
   # Todo o resto exige token. Inclui /v1/ops/*, que dispara trabalho, e as rotas de
-  # ingestao e consulta, que leem e escrevem dados.
-  protected_routes = {
+  # consulta, que leem dados.
+  base_routes = {
+    get_record   = "GET /v1/records/{record_id}"
+    list_records = "GET /v1/records"
+    metrics      = "GET /metrics"
+    ops          = "ANY /v1/ops/{proxy+}"
+    resolution   = "ANY /v1/resolution/{proxy+}"
+  }
+
+  # Ingestao livre: o cliente escolhe o CONTEUDO do registro.
+  #
+  # Fora do roteamento na demonstracao publica. Nao e questao de autenticacao — o
+  # convidado tem token valido —, e de superficie: uma rota alcancavel pela internet
+  # que aceita texto arbitrario grava o que qualquer pessoa quiser no painel que serve
+  # de portfolio. Retirar a rota e mais forte que validar o conteudo, porque nao
+  # depende de eu ter previsto o que filtrar.
+  ingest_routes = {
     ingest_person = "POST /v1/records/person"
     ingest_org    = "POST /v1/records/organization"
-    get_record    = "GET /v1/records/{record_id}"
-    list_records  = "GET /v1/records"
-    metrics       = "GET /metrics"
-    ops           = "ANY /v1/ops/{proxy+}"
-    resolution    = "ANY /v1/resolution/{proxy+}"
   }
+
+  # Semeadura: o cliente escolhe QUANTOS registros, nunca o que eles dizem.
+  demo_routes = {
+    demo_seed = "POST /v1/demo/seed"
+  }
+
+  protected_routes = merge(
+    local.base_routes,
+    var.demo_mode ? local.demo_routes : local.ingest_routes,
+  )
 }
 
 resource "aws_apigatewayv2_route" "public" {

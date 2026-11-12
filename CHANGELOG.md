@@ -6,6 +6,39 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 9 — Demonstracao publica** *(codigo e infraestrutura como codigo; nada aplicado)*
+
+- **`POST /v1/demo/seed`**: gera registros sinteticos **no servidor**, com teto por
+  chamada e teto acumulado. O visitante escolhe quantos, nunca o que eles dizem.
+- **Ingestao livre fechada em modo demonstracao**, em duas camadas: fora do roteamento
+  do API Gateway e `404` na propria aplicacao. A redundancia e deliberada — uma
+  garantia que depende de uma linha de Terraform estar certa nao e garantia da
+  aplicacao.
+- **`src/nexus/demo/synthetic.py`**: gerador sintetico sem Faker. O pacote da Lambda
+  inclui apenas `src/nexus`, e promover o Faker a dependencia de producao acrescentaria
+  megabytes de dados de localizacao para gerar algumas centenas de registros.
+- **Logica de variacao unificada** entre o gerador do pacote e `tools/generator.py`.
+  Duas definicoes de "a mesma entidade observada de outro jeito" divergiriam, e a
+  divergencia apareceria como qualidade de resolucao que muda conforme quem gerou os
+  dados.
+- **`reserve_demo_quota`**: checagem e incremento numa unica escrita condicional. Ler e
+  depois gravar deixaria uma janela em que duas chamadas simultaneas passam — e numa
+  URL publica chamadas simultaneas sao o caso normal. Verificado contra o DynamoDB
+  real: 20 reservas concorrentes contra um teto de 50 produzem exatamente 5 vencedoras.
+- **Terraform**: `demo_mode` troca as rotas de ingestao pela de semeadura, usuario
+  convidado no Cognito, tetos propagados por variavel de ambiente, e um output que
+  calcula o pior caso de abuso em dolares.
+- **`refetchIntervalInBackground: false` explicito** no polling do painel. Ja era o
+  padrao do TanStack Query; agora esta escrito como decisao de custo, porque e o
+  polling — nao os visitantes — que domina a fatura de uma demonstracao publica.
+- 21 testes novos, entre eles o de concorrencia contra o DynamoDB real.
+
+### Alterado
+
+- `tools/generator.py` passou a usar um `random.Random` proprio em vez do `random`
+  global: o modulo compartilhado recebe o gerador por parametro justamente para que a
+  sequencia nao dependa de quem mais sorteia no processo.
+
 **Fase 8 — Finalizacao**
 
 - **Integracao continua** (`.github/workflows/ci.yml`): ruff, `mypy --strict`, a suite

@@ -149,3 +149,46 @@ class TestConsumoSobConcorrencia:
         assert mortos == 0
         assert processados == 12, f"processados={processados} repetidos={repetidos}"
         assert queue.stats().total == 0
+
+
+class TestCotaDaDemonstracao:
+    """A reserva de cota contra o DynamoDB real — Fase 9.
+
+    O repositorio falso resolve isso com um lock de processo. Esse acordo nao prova
+    nada sobre a escrita condicional: o que protege a demonstracao publica e o
+    ``ConditionExpression`` do ``UpdateItem``, avaliado pelo banco, e ele so e
+    exercitado aqui.
+    """
+
+    def test_reserva_acumula_e_devolve_o_total(self, repository: DynamoRecordRepository) -> None:
+        assert repository.reserve_demo_quota(10, ceiling=100) == 10
+        assert repository.reserve_demo_quota(15, ceiling=100) == 25
+
+    def test_recusa_ao_ultrapassar(self, repository: DynamoRecordRepository) -> None:
+        assert repository.reserve_demo_quota(40, ceiling=50) == 40
+
+        assert repository.reserve_demo_quota(20, ceiling=50) is None
+        # Recusa nao consome: o que cabe continua cabendo.
+        assert repository.reserve_demo_quota(10, ceiling=50) == 50
+
+    def test_reservas_simultaneas_nao_furam_o_teto(
+        self, repository: DynamoRecordRepository
+    ) -> None:
+        """Vinte reservas de 10 contra um teto de 50, todas ao mesmo tempo.
+
+        Com leitura seguida de escrita, varias leriam o mesmo valor e todas passariam.
+        A escrita condicional faz o banco recusar as perdedoras.
+        """
+        with ThreadPoolExecutor(max_workers=20) as pool:
+            resultados = list(
+                pool.map(lambda _: repository.reserve_demo_quota(10, ceiling=50), range(20))
+            )
+
+        concedidas = [r for r in resultados if r is not None]
+        assert len(concedidas) == 5
+        # Cada vencedora enxergou um total distinto, e o maior e exatamente o teto.
+        assert sorted(concedidas) == [10, 20, 30, 40, 50]
+
+    def test_quantidade_invalida_nao_reserva(self, repository: DynamoRecordRepository) -> None:
+        assert repository.reserve_demo_quota(0, ceiling=50) is None
+        assert repository.reserve_demo_quota(-5, ceiling=50) is None

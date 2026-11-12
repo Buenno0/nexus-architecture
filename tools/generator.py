@@ -29,9 +29,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
-import re
 import sys
-import unicodedata
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +37,8 @@ from typing import Any
 
 import httpx
 from faker import Faker
+
+from nexus.demo.synthetic import build_batch, slug
 
 DEFAULT_URL = "http://localhost:8080"
 #: Teto rigido de seguranca e custo. Ver COSTS.md.
@@ -67,23 +67,6 @@ class Stats:
         )
 
 
-_EMAIL_UNSAFE = re.compile(r"[^a-z0-9]+")
-
-
-def slug(value: str) -> str:
-    """Reduz um texto a caracteres seguros para a parte local de um e-mail.
-
-    Nomes em portugues trazem acentos e espacos, que o validador de e-mail recusa.
-    Sem isso o gerador produziria enderecos invalidos e a API responderia 422 — o lote
-    inteiro seria rejeitado por um defeito do gerador, nao da plataforma.
-
-    O nome original e preservado em ``full_name``: o slug existe apenas para o endereco.
-    """
-    decomposed = unicodedata.normalize("NFKD", value)
-    ascii_only = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
-    return _EMAIL_UNSAFE.sub(".", ascii_only.lower()).strip(".") or "anon"
-
-
 def make_person(fake: Faker, source: str) -> dict[str, Any]:
     first, last = fake.first_name(), fake.last_name()
     return {
@@ -107,94 +90,6 @@ def make_organization(fake: Faker, source: str) -> dict[str, Any]:
         "phone": fake.phone_number(),
         "country": "BR",
     }
-
-
-def _transpose(value: str) -> str:
-    """Troca duas letras adjacentes, imitando erro de digitacao."""
-    letters = [index for index, char in enumerate(value) if char.isalpha()]
-    if len(letters) < 2:
-        return value
-    position = random.choice(letters[:-1])
-    chars = list(value)
-    chars[position], chars[position + 1] = chars[position + 1], chars[position]
-    return "".join(chars)
-
-
-def _drop_middle_name(value: str) -> str:
-    parts = value.split()
-    return f"{parts[0]} {parts[-1]}" if len(parts) > 2 else value
-
-
-def vary(record: dict[str, Any], fake: Faker) -> dict[str, Any]:
-    """Produz outra observacao da MESMA entidade, com diferencas realistas.
-
-    Variar apenas o telefone tornaria a avaliacao inutil: documento, e-mail e nome
-    continuariam identicos e qualquer resolvedor acertaria. As variacoes abaixo imitam
-    o que acontece entre fontes de verdade — abreviacao, erro de digitacao, troca de
-    provedor, campo nao informado.
-
-    O gabarito continua sabendo que e a mesma entidade, entao uma variacao agressiva
-    demais aparece honestamente como falso negativo na medicao, em vez de ficar
-    escondida.
-    """
-    variant = dict(record)
-    nome = "full_name" if "full_name" in variant else "legal_name"
-
-    escolha = random.choice(
-        ["phone", "name_short", "name_typo", "email_domain", "drop_phone", "drop_document"]
-    )
-    if escolha == "phone":
-        variant["phone"] = fake.phone_number()
-    elif escolha == "name_short":
-        variant[nome] = _drop_middle_name(str(variant.get(nome, "")))
-    elif escolha == "name_typo":
-        variant[nome] = _transpose(str(variant.get(nome, "")))
-    elif escolha == "email_domain":
-        local = str(variant.get("email", "")).partition("@")[0]
-        if local:
-            variant["email"] = f"{local}@outro-provedor.com"
-    elif escolha == "drop_phone":
-        variant.pop("phone", None)
-    elif escolha == "drop_document":
-        # O caso mais dificil: sem o identificador forte, o par so e encontrado se
-        # nome, e-mail ou telefone bastarem.
-        variant.pop("document", None)
-    return variant
-
-
-def build_batch(
-    fake: Faker,
-    *,
-    count: int,
-    record_type: str,
-    source: str,
-    duplicate_rate: float,
-    variant_rate: float,
-) -> list[tuple[dict[str, Any], int]]:
-    """Monta o lote e devolve cada registro com a entidade verdadeira que o originou.
-
-    O indice da entidade e o **gabarito**: duplicatas e variantes herdam o indice do
-    original de onde sairam. Sem ele nao da para afirmar que a resolucao funciona —
-    so que ela roda.
-    """
-    factory = make_person if record_type == "person" else make_organization
-    batch: list[tuple[dict[str, Any], int]] = []
-    originals: list[tuple[dict[str, Any], int]] = []
-
-    for _ in range(count):
-        roll = random.random()
-        if originals and roll < duplicate_rate:
-            record, entity = random.choice(originals)
-            batch.append((dict(record), entity))
-        elif originals and roll < duplicate_rate + variant_rate:
-            record, entity = random.choice(originals)
-            batch.append((vary(record, fake), entity))
-        else:
-            record = factory(fake, source)
-            entity = len(originals)
-            originals.append((record, entity))
-            batch.append((record, entity))
-    return batch
 
 
 def post_batch(
@@ -300,18 +195,22 @@ def main(argv: list[str] | None = None) -> int:
         print("erro: informe --post para enviar ou --dry-run para apenas imprimir", file=sys.stderr)
         return 2
 
+    # Random proprio em vez do global: o modulo compartilhado recebe o gerador por
+    # parametro justamente para que a sequencia nao dependa de quem mais sorteia neste
+    # processo.
+    rng = random.Random(args.seed)
     if args.seed is not None:
-        random.seed(args.seed)
         Faker.seed(args.seed)
 
     fake = Faker("pt_BR")
+    fabrica = make_person if args.type == "person" else make_organization
     batch = build_batch(
-        fake,
+        lambda: fabrica(fake, args.source),
         count=args.count,
-        record_type=args.type,
-        source=args.source,
         duplicate_rate=args.duplicate_rate,
         variant_rate=args.variant_rate,
+        rng=rng,
+        telefone=fake.phone_number,
     )
 
     if args.dry_run:

@@ -293,3 +293,25 @@ class RecordRepository(ABC):
         Backlog parado e diferente de backlog grande: o que importa e ha quanto tempo
         o evento mais antigo espera.
         """
+
+    # ------------------------------------------------------------- demonstracao
+
+    @abstractmethod
+    def reserve_demo_quota(self, amount: int, *, ceiling: int) -> int | None:
+        """Reserva cota de semeadura da demonstracao. Devolve o total apos a reserva.
+
+        ``None`` significa recusa: a reserva ultrapassaria ``ceiling``.
+
+        **Checa e incrementa numa unica escrita condicional.** Ler o total e depois
+        gravar deixaria uma janela em que duas chamadas simultaneas leem o mesmo valor
+        e ambas passam — e a demonstracao fica exposta na internet, onde chamadas
+        simultaneas sao o caso normal, nao o excepcional.
+
+        A operacao e O(1) de proposito. Contar os registros existentes a cada chamada
+        custaria uma leitura proporcional ao acervo **inclusive ao recusar**, e um
+        limite cuja recusa custa caro e um amplificador de abuso, nao uma protecao.
+
+        A cota e consumida pela intencao de gerar, nao pelo resultado: registros que
+        acabam deduplicados tambem contam. E conservador por escolha — o teto existe
+        para limitar escrita, e a deduplicacao so e conhecida depois de escrever.
+        """

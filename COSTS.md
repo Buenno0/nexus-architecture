@@ -222,6 +222,51 @@ seguranca.
 > um push cria recurso. Isso exigiria OIDC em vez de chave estatica, um papel com
 > permissao minima, e autorizacao explicita. Nao e o caso hoje.
 
+## Custo da demonstracao publica (Fase 9)
+
+**US$ 0,00 hoje: nada foi aplicado.** Os numeros abaixo sao estimativa, e nenhum
+recurso sera criado sem autorizacao explicita.
+
+| Servico | Franquia | Uso na demonstracao | Custo |
+|---|---|---|---|
+| Lambda | 1M req/mes, permanente | milhares | US$ 0 |
+| API Gateway HTTP | 1M req/mes, **so nos 12 primeiros meses** | milhares | US$ 0 hoje |
+| SQS | 1M req/mes, permanente | milhares | US$ 0 |
+| DynamoDB armazenamento | 25 GB, permanente | < 100 MB | US$ 0 |
+| **DynamoDB escrita** | **nenhuma** | ~12 WRU por registro | **US$ 0,0075 / 1.000 registros** |
+| **DynamoDB leitura** | **nenhuma** | polling do painel | **US$ 0,02 a 0,10 / mes** |
+| Cognito | 50.000 usuarios/mes | 1 convidado | US$ 0 |
+| CloudWatch Logs | 5 GB/mes | < 500 MB | US$ 0 |
+| EventBridge Scheduler | nenhuma | 2.880/mes | ~US$ 0,004 |
+| Vercel | plano Hobby | 1 projeto | US$ 0 |
+| **Route 53** | nenhuma | 1 hosted zone | **US$ 0,50/mes — unico custo fixo** |
+
+**Sem dominio proprio: US$ 0,05 a US$ 0,15/mes.** Com `nexus.mateus-bueno.dev`:
+**US$ 0,55 a US$ 0,65/mes**.
+
+### O maior custo recorrente nao sao os visitantes
+
+O painel consulta a API em intervalo fixo. No desenvolvimento esse intervalo e de
+**3 segundos**, e com cerca de cinco endpoints por ciclo uma unica aba aberta geraria
+na ordem de **140.000 requisicoes por dia**. Os cliques dos visitantes sao ruido perto
+disso.
+
+Duas correcoes, ambas no frontend:
+
+- `refetchIntervalInBackground: false`, que ja e o padrao do TanStack Query e agora
+  esta explicito no codigo como decisao de custo: **aba oculta para de consultar**.
+- Intervalo de 30s no modo demonstracao, porque uma aba **visivel** e esquecida
+  continua consultando.
+
+### Pior caso de abuso, em dinheiro
+
+Com os tetos padrao — 200 registros por chamada, 5.000 acumulados — alguem que
+explorasse a rota de semeadura ate o limite produziria 5.000 registros, cerca de
+60.000 WRU, **US$ 0,04**. Depois disso a API recusa com `429` ao custo de uma operacao
+O(1) por tentativa.
+
+O budget existente alerta em US$ 5 e US$ 10, inclusive por previsao.
+
 ## Armadilhas identificadas
 
 Servicos que cobram **mesmo sem uso**:

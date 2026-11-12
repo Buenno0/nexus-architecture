@@ -27,7 +27,23 @@ import type {
   Trail,
 } from "./types";
 
-const polling = { refetchInterval: config.pollIntervalMs, refetchOnWindowFocus: true } as const;
+/**
+ * Polling.
+ *
+ * `refetchIntervalInBackground: false` e o padrao do TanStack Query, e esta explicito
+ * porque e uma decisao de custo, nao um detalhe: com ele, uma aba oculta para de
+ * consultar. Sem ele, uma aba esquecida aberta geraria chamadas indefinidamente — na
+ * demonstracao publica, a cada 30s, por tempo indeterminado, e sao essas chamadas que
+ * dominariam a fatura, nao os cliques dos visitantes.
+ *
+ * Aba VISIVEL e esquecida continua consultando: e por isso que o intervalo da
+ * demonstracao e maior que o do desenvolvimento.
+ */
+const polling = {
+  refetchInterval: config.pollIntervalMs,
+  refetchOnWindowFocus: true,
+  refetchIntervalInBackground: false,
+} as const;
 
 export const chaves = {
   health: ["health"] as const,
@@ -166,6 +182,31 @@ export function useDecidirRevisao() {
         body: { decision: decisao, ...(motivo ? { reason: motivo } : {}) },
       }),
     onSuccess: invalidar,
+  });
+}
+
+/** Resultado da semeadura no servidor — modo demonstracao. */
+export interface SemeaduraOut {
+  requested: number;
+  accepted: number;
+  duplicate: number;
+  failed: number;
+  quota_used: number;
+  quota_total: number;
+}
+
+/**
+ * Semeia o acervo pelo servidor, em modo demonstracao.
+ *
+ * O visitante escolhe quantos registros, nunca o que eles dizem.
+ */
+export function semear(
+  quantidade: number,
+  tipo: "person" | "organization" = "person",
+): Promise<SemeaduraOut> {
+  return request<SemeaduraOut>("/v1/demo/seed", {
+    method: "POST",
+    body: { count: quantidade, record_type: tipo },
   });
 }
 

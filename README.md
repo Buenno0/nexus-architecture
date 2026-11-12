@@ -311,6 +311,33 @@ O joelho da curva esta entre 10 e 50 usuarios simultaneos.
 
 ---
 
+## Modo demonstracao (Fase 9)
+
+Preparado no codigo e no Terraform. **Nada foi aplicado na AWS** — a infraestrutura
+continua destruida e o custo acumulado continua em US$ 0,0001.
+
+```bash
+NEXUS_DEMO_MODE=true docker compose up -d --wait
+```
+
+```bash
+curl -s -X POST localhost:8080/v1/demo/seed -H 'content-type: application/json' -d '{"count":150}' | python3 -m json.tool
+```
+
+Com o modo ligado, a ingestao livre **deixa de existir**: `POST /v1/records/*` sai do
+roteamento do API Gateway e responde `404` na propria aplicacao. A unica entrada e
+`/v1/demo/seed`, que gera no servidor.
+
+O motivo nao e economia de codigo. Numa URL publica, uma rota de ingestao aceita o
+conteudo que qualquer pessoa queira gravar — e esse conteudo aparece no painel. **O
+visitante escolhe quantos registros, nunca o que eles dizem.**
+
+A credencial do convidado viaja no bundle JavaScript, porque uma SPA nao guarda
+segredo. Entao a interface nao protege nada: os tetos valem no servidor, o acumulado
+por escrita condicional atomica, e recusar custa uma operacao O(1) — um limite cuja
+recusa custa caro e um amplificador de abuso. Ver [SECURITY.md](SECURITY.md) e
+[COSTS.md](COSTS.md).
+
 ## Integracao continua (Fase 8)
 
 `.github/workflows/ci.yml` roda, a cada push e pull request: `ruff`, `mypy --strict`, a

@@ -76,3 +76,25 @@ class QueuePublishError(NexusError):
 
     status_code = 503
     code = "queue_unavailable"
+
+
+class DemoDisabledError(NexusError):
+    """Rota de demonstracao chamada fora do modo demo.
+
+    ``404`` em vez de ``403``: fora do modo demonstracao esta rota nao existe, e dizer
+    "existe, mas voce nao pode" entrega informacao sobre a plataforma sem necessidade.
+    """
+
+    status_code = 404
+    code = "not_found"
+
+
+class DemoQuotaExceededError(NexusError):
+    """Teto acumulado de semeadura atingido.
+
+    ``429`` e nao ``403``: o pedido e legitimo e o limite e de taxa acumulada, nao de
+    permissao. O cliente nao deve reescrever a chamada, deve parar.
+    """
+
+    status_code = 429
+    code = "demo_quota_exceeded"

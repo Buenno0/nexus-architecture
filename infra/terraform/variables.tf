@@ -163,3 +163,67 @@ variable "enable_safety_net" {
   type        = bool
   default     = true
 }
+
+# ------------------------------------------------------------------ demonstracao
+
+variable "demo_mode" {
+  description = <<-EOT
+    Liga a demonstracao publica.
+
+    Com ela ligada, as rotas de ingestao livre (POST /v1/records/*) SAEM do roteamento
+    do API Gateway e a unica entrada e POST /v1/demo/seed, que gera no servidor.
+
+    A razao nao e economia de codigo. Uma rota de ingestao alcancavel pela internet
+    aceita o conteudo que qualquer pessoa queira gravar, e esse conteudo aparece no
+    painel que serve de portfolio. O visitante escolhe quantos registros, nunca o que
+    eles dizem.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "demo_max_per_call" {
+  description = "Teto de registros por chamada de semeadura. Limite de fatura: a escrita no DynamoDB e linear no volume."
+  type        = number
+  default     = 200
+
+  validation {
+    condition     = var.demo_max_per_call >= 1 && var.demo_max_per_call <= 1000
+    error_message = "Entre 1 e 1000."
+  }
+}
+
+variable "demo_max_total" {
+  description = <<-EOT
+    Teto ACUMULADO de registros que a demonstracao pode criar.
+
+    O teto por chamada nao limita nada sozinho: basta chamar de novo. Com ~12 WRU por
+    registro a US$ 0,625 por milhao, 5.000 registros custam cerca de US$ 0,04 — este
+    numero e o pior caso de abuso, em dinheiro.
+  EOT
+  type        = number
+  default     = 5000
+}
+
+variable "demo_guest_username" {
+  description = "Usuario de convidado da demonstracao."
+  type        = string
+  default     = "convidado"
+}
+
+variable "demo_guest_password" {
+  description = <<-EOT
+    Senha do convidado. Obrigatoria quando demo_mode = true.
+
+    **Esta credencial e publica por construcao**: ela viaja no bundle JavaScript para
+    que o visitante nao veja tela de login, e uma SPA nao guarda segredo (ver
+    cognito.tf). Marcar como sensitive evita que ela apareca em log do Terraform, nao
+    que ela seja secreta.
+
+    O que protege a plataforma nao e esta senha: sao os tetos do servidor, o throttle
+    do API Gateway e o fato de o convidado nao receber nenhuma credencial da AWS.
+  EOT
+  type        = string
+  default     = ""
+  sensitive   = true
+}

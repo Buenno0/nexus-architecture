@@ -51,6 +51,7 @@ class FakeRepository(RecordRepository):
         self.record_links: dict[str, str] = {}
         self.reviews: dict[str, ReviewItem] = {}
         self.stats: dict[str, int] = {}
+        self.demo_seeded = 0
         self.trail: dict[str, list[TrailEvent]] = {}
         self.samples: dict[tuple[str, str], MetricSample] = {}
         #: Quando True, toda escrita de trilha falha — para testar que ela nao derruba
@@ -356,6 +357,20 @@ class FakeRepository(RecordRepository):
     def get_resolution_stats(self) -> dict[str, int]:
         with self._lock:
             return dict(self.stats)
+
+    def reserve_demo_quota(self, amount: int, *, ceiling: int) -> int | None:
+        """Reproduz a condicao do repositorio real: checagem e reserva sob o mesmo lock.
+
+        O falso precisa ser atomico aqui pelo mesmo motivo que o real: um teste de
+        concorrencia que passasse contra um falso permissivo nao provaria nada.
+        """
+        if amount < 1:
+            return None
+        with self._lock:
+            if self.demo_seeded + amount > ceiling:
+                return None
+            self.demo_seeded += amount
+            return self.demo_seeded
 
     # ------------------------------------------------------------ observabilidade
 

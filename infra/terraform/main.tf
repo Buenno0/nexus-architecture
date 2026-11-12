@@ -18,5 +18,8 @@ locals {
     NEXUS_SQS_QUEUE_URL                    = aws_sqs_queue.main.url
     NEXUS_SQS_DLQ_URL                      = aws_sqs_queue.dlq.url
     NEXUS_QUEUE_VISIBILITY_TIMEOUT_SECONDS = tostring(var.queue_visibility_timeout_seconds)
+    NEXUS_DEMO_MODE                        = tostring(var.demo_mode)
+    NEXUS_DEMO_MAX_PER_CALL                = tostring(var.demo_max_per_call)
+    NEXUS_DEMO_MAX_TOTAL                   = tostring(var.demo_max_total)
   }
 }

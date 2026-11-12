@@ -285,6 +285,35 @@ class ReprocessOut(BaseModel):
     already_processed: int
 
 
+# -------------------------------------------------------------------- demonstracao
+
+
+class DemoSeedRequest(BaseModel):
+    """Pedido de semeadura da demonstracao publica.
+
+    O cliente escolhe **quantos** e de que tipo, nao **o que**. As taxas de duplicata e
+    variante sao fixas no servidor: elas definem o que a tela de resolucao mostra, e
+    deixa-las ajustaveis daria ao visitante o poder de produzir um acervo sem nenhum
+    par para resolver, o que tornaria a demonstracao sem sentido.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    count: int = Field(default=100, ge=1, le=1_000)
+    record_type: Literal["person", "organization"] = "person"
+
+
+class DemoSeedOut(BaseModel):
+    requested: int
+    accepted: int
+    duplicate: int
+    failed: int
+    #: Cota ja consumida e teto acumulado. Expostos para a interface poder avisar antes
+    #: de a proxima chamada ser recusada.
+    quota_used: int
+    quota_total: int
+
+
 # -------------------------------------------------------------------- observability
 
 

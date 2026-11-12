@@ -128,6 +128,52 @@ culpada, mas reverte-la e manual.
 - Registros de origem sao imutaveis por design ([ADR-002](docs/adr/ADR-002-identidade-e-idempotencia.md)).
 - Operacoes caras no Control Center exigem confirmacao e possuem teto rigido.
 
+## Demonstracao publica (Fase 9)
+
+Expor a plataforma na internet muda a analise, e vale escrever o que muda antes de
+aplicar qualquer coisa.
+
+### A credencial do convidado e publica, por construcao
+
+Para o visitante nao ver tela de login, as credenciais do convidado viajam no bundle
+JavaScript. **Isso nao e descuido.** Uma SPA nao guarda segredo — qualquer chave
+embutida no JavaScript esta publica, e o ADR do Cognito ja dizia isso quando a
+autenticacao foi desenhada.
+
+A consequencia precisa ser levada a serio em vez de contornada: **qualquer pessoa
+extrai o token e chama a API diretamente**, sem passar pela interface. Portanto a
+interface nao e uma protecao, e nenhum limite que exista so nela limita coisa alguma.
+
+### O que protege, em ordem
+
+1. **A ingestao livre nao existe.** `POST /v1/records/*` sai do roteamento do API
+   Gateway **e** responde `404` na propria aplicacao. A redundancia e deliberada: a
+   primeira e a protecao que funciona no dia a dia, a segunda e a que sobrevive a um
+   erro de configuracao do gateway ou a uma invocacao direta da Lambda. Uma garantia
+   que depende de uma linha de Terraform estar certa nao e garantia da aplicacao.
+2. **O visitante escolhe quantos registros, nunca o que eles dizem.** `/v1/demo/seed`
+   gera no servidor. Sem isso, um estranho grava o texto que quiser no painel que
+   serve de portfolio — e e o que acontece com todo formulario aberto na internet.
+3. **Os tetos sao avaliados no servidor**, por chamada e acumulado, e o acumulado usa
+   escrita condicional atomica: ler e depois gravar deixaria uma janela em que duas
+   chamadas simultaneas passam, e numa URL publica chamadas simultaneas sao o caso
+   normal.
+4. **Recusar e mais barato que aceitar.** A reserva de cota e uma operacao O(1).
+   Contar os registros a cada chamada custaria leitura proporcional ao acervo
+   **inclusive ao recusar**, e um limite cuja recusa custa caro e um amplificador de
+   abuso, nao uma protecao.
+5. **O throttle do stage** limita a taxa: 10 req/s, rajada de 20.
+6. **O convidado nao recebe credencial da AWS.** Apenas um JWT que o API Gateway
+   aceita. Nao ha identity pool, entao nao ha acesso a servico nenhum.
+
+### O que continua exposto
+
+- As rotas `/v1/ops/*` disparam trabalho e o convidado pode chama-las. E intencional:
+  acionar o worker **e** a demonstracao. O custo disso e limitado pelo volume do
+  acervo, que os tetos acima limitam.
+- O acervo e visivel para qualquer visitante. Todo ele e sintetico, gerado pelo
+  servidor.
+
 ## Limitacoes conhecidas
 
 - **Nao ha autenticacao.** A API e aberta dentro do ambiente local, incluindo as rotas

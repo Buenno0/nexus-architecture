@@ -177,6 +177,8 @@ def recency_pk(record_type: RecordType) -> str:
 TRANSACT_MAX_ITEMS = 100
 
 STATS_KEY = "STATS#resolution"
+#: Item unico que guarda a cota ja consumida pela semeadura da demonstracao.
+DEMO_QUOTA_KEY = "DEMO#quota"
 
 
 def block_pk(key: str) -> str:
@@ -1406,6 +1408,34 @@ class DynamoRecordRepository(RecordRepository):
         except (ClientError, BotoCoreError) as exc:
             # Metrica nunca derruba o processamento que ela descreve.
             logger.warning("resolution_stats_failed", extra={"reason": str(exc)})
+
+    def reserve_demo_quota(self, amount: int, *, ceiling: int) -> int | None:
+        """Ver o contrato. Uma unica ``UpdateItem`` condicional faz checagem e reserva."""
+        if amount < 1:
+            return None
+        try:
+            response = self._client.update_item(
+                TableName=self._table,
+                Key={"pk": {"S": DEMO_QUOTA_KEY}, "sk": {"S": DEMO_QUOTA_KEY}},
+                UpdateExpression="ADD seeded :a",
+                # O item pode nao existir ainda: a primeira reserva cria. O teto e
+                # avaliado sobre o valor ANTERIOR, entao a comparacao usa o restante.
+                ConditionExpression="attribute_not_exists(seeded) OR seeded <= :limite",
+                ExpressionAttributeValues={
+                    ":a": {"N": str(amount)},
+                    ":limite": {"N": str(max(ceiling - amount, 0))},
+                },
+                ReturnValues="UPDATED_NEW",
+            )
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                return None
+            raise self._fail("reserve_demo_quota", exc) from exc
+        except BotoCoreError as exc:
+            raise self._fail("reserve_demo_quota", exc) from exc
+
+        total = response.get("Attributes", {}).get("seeded", {}).get("N")
+        return int(total) if total is not None else amount
 
     def get_resolution_stats(self) -> dict[str, int]:
         try:

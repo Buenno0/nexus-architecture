@@ -6,6 +6,8 @@ em ``service.py``, o que permite testar o caminho de ingestao sem subir um servi
 
 from __future__ import annotations
 
+import random
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -17,9 +19,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from nexus import __version__
+from nexus.demo import synthetic
 from nexus.ingestion.schemas import (
     AlertOut,
     AlertsOut,
+    DemoSeedOut,
+    DemoSeedRequest,
     DispatchOut,
     DispatchRequest,
     EntityMemberOut,
@@ -74,7 +79,13 @@ from nexus.queue.worker import Worker
 from nexus.resolution.clustering import ClusterManager
 from nexus.shared.clock import utcnow
 from nexus.shared.config import Settings, get_settings
-from nexus.shared.errors import MissingIdempotencyKeyError, NexusError, RecordNotFoundError
+from nexus.shared.errors import (
+    DemoDisabledError,
+    DemoQuotaExceededError,
+    MissingIdempotencyKeyError,
+    NexusError,
+    RecordNotFoundError,
+)
 from nexus.shared.logging import configure_logging, get_correlation_id, get_logger
 
 logger = get_logger(__name__)
@@ -273,9 +284,10 @@ async def ingest_person(
     payload: PersonIn,
     request: Request,
     service: ServiceDep,
+    settings: SettingsDep,
     idempotency_key: IdempotencyKeyDep,
 ) -> JSONResponse:
-    return await _ingest(RecordType.PERSON, payload, request, service, idempotency_key)
+    return await _ingest(RecordType.PERSON, payload, request, service, settings, idempotency_key)
 
 
 @app.post(
@@ -295,9 +307,12 @@ async def ingest_organization(
     payload: OrganizationIn,
     request: Request,
     service: ServiceDep,
+    settings: SettingsDep,
     idempotency_key: IdempotencyKeyDep,
 ) -> JSONResponse:
-    return await _ingest(RecordType.ORGANIZATION, payload, request, service, idempotency_key)
+    return await _ingest(
+        RecordType.ORGANIZATION, payload, request, service, settings, idempotency_key
+    )
 
 
 async def _ingest(
@@ -305,8 +320,19 @@ async def _ingest(
     payload: PersonIn | OrganizationIn,
     request: Request,
     service: IngestionService,
+    settings: Settings,
     idempotency_key: str,
 ) -> JSONResponse:
+    # Em modo demonstracao a ingestao livre nao existe — nem aqui, nem no roteamento
+    # do API Gateway.
+    #
+    # Parece redundante e nao e. Retirar a rota do gateway e a protecao que funciona;
+    # esta aqui e a que sobrevive a um erro de configuracao do gateway, a uma invocacao
+    # direta da Lambda e a qualquer caminho que eu nao tenha previsto. Uma garantia que
+    # depende de uma linha de Terraform estar certa nao e uma garantia da aplicacao.
+    if settings.demo_mode:
+        raise DemoDisabledError("Rota nao encontrada")
+
     # O corpo bruto distingue replay legitimo de reuso indevido da chave (ADR-002).
     # Starlette ja o leu para validar o modelo; esta chamada devolve o valor em cache.
     raw_body = await request.body()
@@ -903,4 +929,127 @@ async def ops_sample(
         bucket=resultado.bucket,
         values=resultado.values,
         reason=resultado.reason,
+    )
+
+
+# ------------------------------------------------------------------- demonstracao
+
+#: Proporcoes fixas do acervo gerado pela demonstracao.
+#:
+#: 15% de duplicatas exatas e 30% de variantes da mesma entidade. Sao os mesmos valores
+#: usados para medir a resolucao na Fase 5, e existem para que a tela de Entity
+#: Resolution tenha o que mostrar: um acervo so de registros distintos nao produz
+#: nenhum par, nenhuma fusao e nenhuma revisao pendente.
+DEMO_DUPLICATE_RATE = 0.15
+DEMO_VARIANT_RATE = 0.30
+DEMO_SOURCE = "demo-publica"
+
+
+def _seed_batch(count: int, record_type: RecordType) -> list[dict[str, Any]]:
+    """Monta o lote sintetico. Sem semente fixa: cada visita gera um acervo diferente."""
+    rng = random.Random()
+    telefone = lambda: synthetic.telefone_sintetico(rng)  # noqa: E731
+    fabrica = (
+        synthetic.pessoa_sintetica
+        if record_type is RecordType.PERSON
+        else synthetic.organizacao_sintetica
+    )
+    lote = synthetic.build_batch(
+        lambda: fabrica(rng, DEMO_SOURCE),
+        count=count,
+        duplicate_rate=DEMO_DUPLICATE_RATE,
+        variant_rate=DEMO_VARIANT_RATE,
+        rng=rng,
+        telefone=telefone,
+    )
+    return [registro for registro, _ in lote]
+
+
+@app.post(
+    "/v1/demo/seed",
+    response_model=DemoSeedOut,
+    summary="Gera registros sinteticos no servidor (modo demonstracao)",
+    responses={
+        404: {"model": ErrorOut, "description": "Fora do modo demonstracao"},
+        422: {"model": ErrorOut, "description": "Acima do teto por chamada"},
+        429: {"model": ErrorOut, "description": "Teto acumulado atingido"},
+    },
+    tags=["demo"],
+)
+async def demo_seed(
+    service: ServiceDep,
+    repository: RepositoryDep,
+    settings: SettingsDep,
+    body: DemoSeedRequest | None = None,
+) -> DemoSeedOut:
+    """Semeia o acervo da demonstracao publica.
+
+    Existe para que a ingestao livre possa ser retirada do roteamento. Numa URL
+    publica, ``POST /v1/records/person`` aceita o conteudo que qualquer pessoa queira
+    gravar, e esse conteudo aparece no painel. Aqui o visitante escolhe **quantos**
+    registros, nunca **o que** eles dizem.
+
+    A ordem importa: a cota e reservada **antes** de gerar qualquer coisa. Reservar
+    depois deixaria a escrita acontecer e so entao descobrir que nao podia.
+    """
+    if not settings.demo_mode:
+        raise DemoDisabledError("Rota nao encontrada")
+
+    pedido = body or DemoSeedRequest()
+    if pedido.count > settings.demo_max_per_call:
+        raise DemoQuotaExceededError(
+            f"Maximo de {settings.demo_max_per_call} registros por chamada",
+            details={"requested": pedido.count, "max_per_call": settings.demo_max_per_call},
+        )
+
+    total = await run_in_threadpool(
+        repository.reserve_demo_quota, pedido.count, ceiling=settings.demo_max_total
+    )
+    if total is None:
+        raise DemoQuotaExceededError(
+            "Teto acumulado da demonstracao atingido. O acervo precisa ser reiniciado.",
+            details={"quota_total": settings.demo_max_total},
+        )
+
+    record_type = RecordType(pedido.record_type)
+    lote = _seed_batch(pedido.count, record_type)
+
+    aceitos = duplicados = falhas = 0
+    for registro in lote:
+        try:
+            resultado = await run_in_threadpool(
+                service.ingest,
+                record_type,
+                registro,
+                raw_body=b"",
+                # Chave nova por registro: cada envio e uma operacao distinta. Reusa-la
+                # transformaria tudo em replay e esconderia a deduplicacao por conteudo,
+                # que e justamente o que a demonstracao mostra.
+                idempotency_key=str(uuid.uuid4()),
+                correlation_id=get_correlation_id() or "",
+            )
+        except NexusError as exc:
+            # Uma falha isolada nao derruba o lote: a demonstracao deve mostrar o que
+            # conseguiu fazer, e o numero de falhas aparece na resposta.
+            falhas += 1
+            logger.warning("demo_seed_record_failed", extra={"reason": str(exc)})
+            continue
+        # 202 e observacao nova; 200 aqui so pode ser conteudo ja observado, porque a
+        # chave de idempotencia e nova a cada registro e replay esta descartado.
+        if resultado.status_code == 202:
+            aceitos += 1
+        else:
+            duplicados += 1
+
+    logger.info(
+        "demo_seed_completed",
+        extra={"requested": pedido.count, "accepted": aceitos, "duplicate": duplicados},
+    )
+    return DemoSeedOut(
+        requested=pedido.count,
+        accepted=aceitos,
+        duplicate=duplicados,
+        failed=falhas,
+        quota_used=total,
+        quota_total=settings.demo_max_total,
     )

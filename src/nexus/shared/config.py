@@ -132,6 +132,27 @@ class Settings(BaseSettings):
     #: Taxa de erro HTTP acima disso acende alerta, em fracao.
     alert_error_rate: float = Field(default=0.05, ge=0.0, le=1.0)
 
+    # Demonstracao publica — Fase 9
+    #: Liga o modo demonstracao.
+    #:
+    #: Em modo demo a ingestao livre e retirada do roteamento e o unico caminho de
+    #: entrada e ``POST /v1/demo/seed``, que gera no servidor. A razao nao e economia
+    #: de codigo: uma rota de ingestao aberta na internet aceita o texto que qualquer
+    #: pessoa quiser gravar, e esse texto aparece no painel que serve de portfolio.
+    demo_mode: bool = False
+    #: Teto de registros por chamada de semeadura.
+    #:
+    #: O custo de escrita no DynamoDB e linear no volume (~12 WRU por registro), entao
+    #: este numero e um limite de fatura, nao de conforto.
+    demo_max_per_call: int = Field(default=200, ge=1, le=1_000)
+    #: Teto acumulado de registros que a demonstracao pode criar.
+    #:
+    #: Existe porque o teto por chamada nao limita nada sozinho: basta chamar de novo.
+    #: A cota e reservada por escrita condicional atomica antes de gerar qualquer
+    #: registro, entao a recusa custa uma operacao O(1) — recusar precisa ser mais
+    #: barato que aceitar, senao o proprio limite vira o ataque.
+    demo_max_total: int = Field(default=5_000, ge=1, le=100_000)
+
     # Interface — Fase 4
     cors_allowed_origins: tuple[str, ...] = ("http://localhost:5173",)
 

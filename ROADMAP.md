@@ -197,3 +197,41 @@ Dois defeitos foram encontrados **executando** o roteiro, nao escrevendo-o: o se
 `api` nao tinha healthcheck, entao `docker compose up --wait` devolvia antes de a porta
 abrir; e o laco de injecao de falha esperava um tempo fixo que o backoff exponencial
 ultrapassava, de modo que os atos do alerta narravam um alarme que nunca acendeu.
+
+---
+
+## Fase 9 — Demonstracao publica  *(em andamento)*
+
+Objetivo: um endereco que um interessado abre e **usa**, em vez de ler. A arquitetura
+favorece isso de um jeito que poucas favorecem — nada processa sozinho, entao o
+visitante apertando "processar fila" nao e um atalho para demonstrar o modelo de
+execucao sob demanda: **e** o modelo.
+
+### Feito (nenhum recurso de nuvem criado)
+
+- [x] `POST /v1/demo/seed`: gera no servidor, com teto por chamada e teto acumulado
+- [x] `src/nexus/demo/synthetic.py`: gerador sem Faker, porque o pacote da Lambda
+      inclui so `src/nexus` e o Faker e dependencia de desenvolvimento
+- [x] **Logica de variacao unificada** com `tools/generator.py` — duas definicoes de
+      "a mesma entidade observada de outro jeito" divergiriam
+- [x] `reserve_demo_quota`: checagem e incremento numa **unica escrita condicional**
+- [x] Ingestao livre fechada **na aplicacao**, nao so no roteamento do API Gateway
+- [x] Terraform: `demo_mode` troca as rotas, usuario convidado no Cognito
+- [x] Polling do painel com `refetchIntervalInBackground: false` explicito
+- [x] 21 testes novos, incluindo concorrencia contra o DynamoDB real
+
+### Pendente — exige autorizacao e custa dinheiro
+
+- [ ] `terraform apply` — **nao executado**. Sem credenciais nesta maquina e sem
+      autorizacao
+- [ ] Deploy do Control Center na Vercel
+- [ ] Semear o acervo inicial para a demonstracao nao abrir vazia
+- [ ] Medir o cold start, que a Fase 7 nao pode quantificar
+- [ ] Registrar o custo real depois de uma semana no ar
+
+### Custo
+
+**US$ 0,05 a US$ 0,15/mes** sem dominio proprio; **US$ 0,55 a US$ 0,65** com a hosted
+zone do Route 53, que e o unico recurso do projeto que cobra estando parado.
+
+Pior caso de abuso, com os tetos padrao: 5.000 registros, cerca de **US$ 0,04**.
