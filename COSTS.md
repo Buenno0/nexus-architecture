@@ -193,7 +193,9 @@ tabela de "Quanto custa um teste de carga" acima continua valendo como estimativ
 
 ## Custo da Fase 8 — integracao continua
 
-**US$ 0,00 hoje**, porque o pipeline nunca executou: o repositorio e local.
+**US$ 0,00.** O repositorio e publico, e repositorios publicos tem minutos ilimitados
+em runners padrao do GitHub Actions. A primeira execucao consumiu 1min31s de relogio
+nos quatro jobs.
 
 Quando for publicado, o custo depende da visibilidade, e a diferenca nao e pequena:
 

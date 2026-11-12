@@ -12,7 +12,7 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
   Python **inteira** com DynamoDB Local subido pelo mesmo `docker-compose.yml` do
   desenvolvimento, tipos/lint/testes/build do Control Center e `terraform validate` com
   `-backend=false`. Nenhum job recebe credencial da AWS.
-  **O pipeline nunca executou:** o repositorio e local, sem remote.
+  Primeira execucao verde nos quatro jobs em 12/11/2026 ([run 43149734246](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246)).
 - `NEXUS_TEST_REQUIRE_DYNAMO`, que transforma "DynamoDB indisponivel" de teste pulado em
   falha. Sem isso, um banco que nao sobe no CI deixaria a suite de integracao inteira
   pular em silencio e o pipeline verde.

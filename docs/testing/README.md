@@ -43,6 +43,9 @@ Os testes de integracao rodam contra DynamoDB Local **de verdade** — transacao
 esparso e escrita condicional nao sao simulados. O CI os executa; a variavel
 `NEXUS_TEST_REQUIRE_DYNAMO` impede que a ausencia do banco vire suite pulada em silencio.
 
+O pipeline roda no GitHub Actions desde 12/11/2026, em
+[Buenno0/nexus-architecture](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246).
+
 ## O que mudou de estado
 
 Limitacoes que os relatorios de fase registram e que **nao valem mais**:
@@ -56,7 +59,7 @@ Limitacoes que os relatorios de fase registram e que **nao valem mais**:
 | Fase 4 | "O historico vive na aba; recarregar zera" | Fase 6, serie persistida |
 | Fase 5 | "Nao ha interface de revisao, apenas endpoints" | Fase 4, tela Entity Resolution com confirmar/recusar |
 | Fase 6 | "Sem teste de carga; o custo da trilha sob volume e desconhecido" | Fase 7: **4 ms**, 25% do caminho de ingestao |
-| Fase 1–7 | "CI/CD fora de escopo" | Fase 8 — **escrito, nunca executado** (ver abaixo) |
+| Fase 1–7 | "CI/CD fora de escopo" | Fase 8 — **verde no GitHub Actions** desde 12/11/2026 |
 
 ## Limitacoes atuais, agrupadas por causa
 
@@ -95,9 +98,6 @@ Estas nao sao para resolver. Cada uma e uma troca escolhida, com a razao registr
 
 ### Pendencias reais
 
-- **O CI esta escrito e nunca executou.** O repositorio e local, sem remote. Enquanto
-  nao for publicado, `.github/workflows/ci.yml` e um arquivo com intencao, e os comandos
-  dele foram verificados a mao nesta maquina — nao e a mesma coisa.
 - **A fila local nao atravessa a fronteira do container** (ADR-004), e nao escala para
   varios hosts. Por desenho local; some com SQS.
 - **Nao ha autenticacao no ambiente local.** Os endpoints `/v1/ops/*` disparam trabalho.

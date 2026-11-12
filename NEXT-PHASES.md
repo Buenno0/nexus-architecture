@@ -366,8 +366,8 @@ apenas o caminho mais caro e esconde quanto replay e deduplicacao custam.
 > [docs/testing/README.md](docs/testing/README.md), que consolida os sete relatorios de
 > fase. Duas diferencas em relacao ao planejado abaixo:
 >
-> - **O CI esta escrito e nunca executou.** O repositorio e local, sem remote. Publicar
->   no GitHub e decisao do autor, nao da fase.
+> - **O CI foi publicado e executou.** O repositorio saiu em 12/11/2026, no mesmo dia
+>   em que a fase fechou, e a primeira execucao passou nos quatro jobs.
 > - **`docs.nexus.mateus-bueno.dev` ficou fora de escopo.** Exige DNS e hospedagem; a
 >   documentacao vive no repositorio, em Markdown que o GitHub renderiza, incluindo os
 >   diagramas Mermaid.

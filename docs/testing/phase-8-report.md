@@ -82,13 +82,36 @@ que nao autentica e nao le estado. O job existe para impedir que o Terraform ver
 apodreca enquanto a infraestrutura esta destruida — nao para implantar. A consequencia
 de custo esta em COSTS.md: nao existe caminho em que um push crie recurso.
 
-### O que nao posso afirmar
+### A primeira execucao, e o que ela prova
 
-**O pipeline nunca executou.** O repositorio e local, sem remote. Verifiquei cada
-comando a mao nesta maquina, o que nao e a mesma coisa: a ordem dos passos, o cache das
-acoes, as permissoes do `GITHUB_TOKEN` e o comportamento do Docker no runner nao foram
-exercitados. Ate o repositorio ser publicado, `.github/workflows/ci.yml` e um arquivo
-com intencao.
+O repositorio foi publicado em 12/11/2026 como
+[Buenno0/nexus-architecture](https://github.com/Buenno0/nexus-architecture), publico, e
+**a primeira execucao passou nos quatro jobs** ([run 43149734246](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246)), em 1min31s.
+
+Escrevi acima, antes de publicar, que nao podia afirmar nada sobre a ordem dos passos, o
+cache das acoes ou o Docker do runner. Agora posso, e o resultado foi melhor do que eu
+esperava: nada quebrou. Registro isso sem ajustar a previsao para parecer acertada — eu
+contava com pelo menos uma falha, e nao houve.
+
+O job de testes se decompoe assim:
+
+| Passo | Duracao |
+|---|---|
+| Instalar dependencias (`uv sync --frozen`) | 3s |
+| Subir o DynamoDB Local pelo compose | 12s |
+| Suite completa | 72s |
+
+**Os 12 segundos do banco sao a parte que importa.** A suite de integracao nao pode
+passar sem ele: com `NEXUS_TEST_REQUIRE_DYNAMO=1`, a ausencia do DynamoDB faz o fixture
+de sessao chamar `pytest.fail`, e o job cai. Job verde, portanto, significa que as
+transacoes, o indice esparso e as escritas condicionais foram exercitadas de verdade no
+runner — nao e inferencia sobre o que *provavelmente* aconteceu.
+
+**O que continuo sem poder afirmar:** nao li o log do job. A API publica do GitHub nao
+serve logs de execucao sem autenticacao, e `gh` nao esta autenticado nesta maquina.
+Entao a contagem de 555 testes vem da suite local e do desenho da trava, nao de ter lido
+`555 passed` na saida do runner. Quem quiser conferir abre o
+[log do job](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246) no navegador.
 
 ## 5. Testes realizados
 
@@ -176,7 +199,8 @@ consequencia e vira ADR.
 
 ## 8. Limitacoes conhecidas
 
-- **O CI nunca executou.** Depende de publicar o repositorio no GitHub.
+- **O log do CI nao foi lido daqui.** A API publica nao serve logs sem autenticacao;
+  o resultado por job e por passo veio da API, a contagem de testes veio da suite local.
 - **`docs.nexus.mateus-bueno.dev` nao existe.** Exige DNS e hospedagem; fora de escopo
   por decisao. A documentacao e Markdown no repositorio, renderizado pelo GitHub.
 - **A demonstracao nao e gravada.** Nao ha video nem GIF. O roteiro e executavel e
@@ -189,8 +213,9 @@ consequencia e vira ADR.
 
 ## 9. Proximos passos
 
-1. **Publicar o repositorio no GitHub** e deixar o CI executar de verdade. Ate la, o
-   item correspondente do ROADMAP continua aberto.
+1. **Observar o CI ao longo de alguns pushes.** Uma execucao verde prova que o
+   pipeline funciona hoje; nao prova que ele e estavel. Testes de integracao contra um
+   banco em container sao candidatos classicos a intermitencia.
 2. **Reavaliar o custo da trilha.** A Fase 7 mediu 4 ms, 25% do caminho de ingestao, e
    `NEXUS_TRAIL_ENABLED` existe. Manter ligada e defensavel; a decisao e do autor, e
    agora tem numero e chave.

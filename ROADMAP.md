@@ -186,8 +186,8 @@ conteudo da fase e nao um apendice constrangedor.
 - [x] **Limitacoes agrupadas por causa**, distinguindo troca deliberada de pendencia
 - [x] CI escrito: `.github/workflows/ci.yml` — ruff, mypy, suite Python completa com
       DynamoDB real, Control Center e `terraform validate`
-- [ ] **CI executando a cada push** — depende de publicar o repositorio no GitHub.
-      Enquanto isso nao acontecer, o workflow e um arquivo que nunca rodou
+- [x] **CI executando a cada push**: repositorio publicado em 12/11/2026 e primeira
+      execucao verde nos quatro jobs ([run 43149734246](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246))
 - [ ] Documentacao publicada em `docs.nexus.mateus-bueno.dev` — exige DNS e hospedagem,
       fora de escopo por decisao
 

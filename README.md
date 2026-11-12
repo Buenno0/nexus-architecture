@@ -1,5 +1,7 @@
 # Nexus Architecture
 
+[![CI](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml/badge.svg)](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml)
+
 > Engineering distributed systems, one component at a time.
 
 Plataforma experimental de engenharia de sistemas distribuidos. Demonstra como dados
@@ -21,7 +23,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
 | Performance Engineering | 7 | Medido localmente — gargalo identificado; nuvem pendente |
-| Finalizacao | 8 | Diagramas, ADRs consolidados, demonstracao roteirizada, CI **escrito e nao executado** |
+| Finalizacao | 8 | Diagramas, ADRs consolidados, demonstracao roteirizada, **CI verde no GitHub Actions** |
 
 A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
 validada ponta a ponta; em 09/11 foi **destruida**, deixando a conta limpa. Custo real
@@ -268,9 +270,9 @@ suite Python **inteira** (incluindo os testes de integracao, contra DynamoDB Loc
 subido pelo mesmo `docker-compose.yml` do desenvolvimento), tipos, lint, testes e build
 do Control Center, e `terraform validate` com `-backend=false`.
 
-> **O pipeline nunca executou.** Este repositorio e local, sem remote: ate ser publicado
-> no GitHub, o workflow e um arquivo com intencao. Os comandos que ele roda foram
-> verificados manualmente nesta maquina, o que nao e a mesma coisa.
+O repositorio foi publicado em 12/11/2026 e a **primeira execucao passou nos quatro
+jobs** ([run 43149734246](https://github.com/Buenno0/nexus-architecture/actions/runs/43149734246)): 1min31s no total, com a suite Python levando 72s e o
+DynamoDB Local subindo em 12s.
 
 Nenhum job recebe credencial da AWS e nenhum cria recurso.
 
@@ -352,7 +354,6 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - Nenhum recurso de nuvem foi provisionado; nenhuma medicao local vale como previsao
   de desempenho ou custo na AWS.
 
-- **O CI nunca executou**, porque o repositorio ainda nao foi publicado.
 
 Lista completa, agrupada por causa e com as limitacoes ja vencidas separadas das que
 continuam valendo: [docs/testing/README.md](docs/testing/README.md).
