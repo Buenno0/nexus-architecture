@@ -38,6 +38,13 @@ e-mail, campo omitido, documento ausente.
 | Recall | 0,9823 | **1,0000** |
 | F1 | 0,9911 | **1,0000** |
 
+> **O que estes numeros nao dizem.** As variacoes do conjunto foram geradas por
+> `tools/generator.py`, e o gabarito sabe quais pares sao verdadeiros porque o gerador
+> os criou. Acertar 100% contra as proprias variacoes nao prova que o resolvedor
+> funciona com dados reais — prova que ele cobre as formas de sujeira que eu soube
+> imitar. O valor esta na coluna da esquerda: sem gabarito, os 2 falsos negativos da
+> primeira execucao seriam invisiveis.
+
 ### O ciclo que justifica o gabarito
 
 A primeira execucao perdeu 2 pares. A fila de revisao mostrou a causa concreta: um par

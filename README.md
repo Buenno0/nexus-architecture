@@ -58,10 +58,20 @@ escrito que nao existe.
 | Nexus Queue Engine | 2 | Implementado — fila, retry, DLQ, redrive |
 | Cloud Infrastructure | 3 | Validado na AWS e **destruido** — custo real US$ 0,0001 |
 | Nexus Control Center | 4 | Implementado — 5 telas, roda local |
-| Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
+| Nexus Entity Resolution | 5 | Implementado — perfeito contra o gabarito sintetico, o que diz menos do que parece[^1] |
 | Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
 | Performance Engineering | 7 | Medido localmente — gargalo identificado; nuvem pendente |
 | Finalizacao | 8 | Diagramas, ADRs consolidados, demonstracao roteirizada, **CI verde no GitHub Actions** |
+
+[^1]: Precisao 1,0000 e recall 1,0000 sobre 500 registros com variacoes que **eu mesmo
+    gerei**: abreviacao, erro de digitacao, troca de provedor, campo omitido. O gabarito
+    sabe quais pares sao verdadeiros porque o gerador os criou. Isso mede o resolvedor
+    contra este conjunto, nao contra o mundo — dados reais trazem sujeira que o gerador
+    nao imita, e um numero perfeito contra dados proprios e exatamente o tipo de
+    resultado que merece desconfianca. O valor do exercicio esta no ciclo que ele
+    permitiu: a primeira execucao deu recall 0,9823, a fila de revisao mostrou a causa
+    concreta, e a correcao subiu o recall **sem introduzir nenhum falso positivo**. Ver
+    [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md).
 
 A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
 validada ponta a ponta; em 09/11 foi **destruida**, deixando a conta limpa. Custo real

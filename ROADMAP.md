@@ -109,7 +109,9 @@ Ver [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) e
 - [x] Score detalhado persistido para auditoria
 - [x] Analise de falsos positivos e negativos
 
-Recall 1,0000 e precisao mantida apos o ajuste de `token_set_ratio`. Ver
+Recall 1,0000 e precisao mantida apos o ajuste de `token_set_ratio` — **contra o
+gabarito sintetico**, cujas variacoes o proprio gerador criou. O numero mede o
+resolvedor contra este conjunto, nao contra dados reais. Ver
 [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) e
 [ADR-006](docs/adr/ADR-006-entity-resolution.md).
 
