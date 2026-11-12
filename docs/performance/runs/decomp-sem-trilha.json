@@ -1,0 +1,75 @@
+{
+  "nome": "decomp-sem-trilha",
+  "nota": "regime linear, cenario novo, sem-trilha",
+  "quando": "2026-11-12T00:26:12.496271+00:00",
+  "parametros": {
+    "usuarios": 10,
+    "taxa_de_subida": 10.0,
+    "duracao": "45s",
+    "decorrido_s": 45.4
+  },
+  "ambiente": {
+    "trail_enabled": false,
+    "api_workers": 1,
+    "environment": "local",
+    "registros_pre_carregados": 1000
+  },
+  "latencia": {
+    "agregado": {
+      "requisicoes": 1389,
+      "falhas": 0,
+      "rps": 31.5,
+      "media_ms": 15.14,
+      "p50_ms": 12.0,
+      "p95_ms": 27.0,
+      "p99_ms": 86.0,
+      "max_ms": 129.55
+    },
+    "cenarios": {
+      "POST POST /v1/records/person [novo]": {
+        "requisicoes": 1379,
+        "falhas": 0,
+        "rps": 31.28,
+        "media_ms": 14.65,
+        "p50_ms": 12.0,
+        "p95_ms": 25.0,
+        "p99_ms": 63.0,
+        "max_ms": 129.55
+      }
+    },
+    "aquecimento": {
+      "requisicoes": 10,
+      "falhas": 0,
+      "rps": 0.23,
+      "media_ms": 81.92,
+      "p50_ms": 86.0,
+      "p95_ms": 97.0,
+      "p99_ms": 97.0,
+      "max_ms": 97.01
+    }
+  },
+  "contadores_delta": {
+    "ingestion_accepted_total{record_type=person}": 1402,
+    "outbox_pending_total": 1402,
+    "outbox_dispatched_total": 1402,
+    "http_requests_total{method=POST,path=/v1/records/person,status=202}": 1402,
+    "http_requests_total{method=GET,path=/v1/ops/queue,status=200}": 1
+  },
+  "fila": {
+    "antes": {
+      "pending": 0,
+      "in_flight": 0,
+      "dead": 0
+    },
+    "depois": {
+      "pending": 1402,
+      "in_flight": 0,
+      "dead": 0
+    }
+  },
+  "outbox": {
+    "antes": 0,
+    "depois": 0
+  },
+  "gerador_saturado": false
+}

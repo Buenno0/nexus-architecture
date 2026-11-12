@@ -1,0 +1,23 @@
+{
+  "nexus-api": {
+    "mediana_pct": 90.5,
+    "pico_pct": 201.5,
+    "teto_pct": 200.0,
+    "uso_do_teto_mediana": 0.45,
+    "amostras": 22
+  },
+  "nexus-dynamodb": {
+    "mediana_pct": 43.8,
+    "pico_pct": 52.3,
+    "teto_pct": 200.0,
+    "uso_do_teto_mediana": 0.22,
+    "amostras": 22
+  },
+  "locust-no-host": {
+    "mediana_pct": 21.4,
+    "pico_pct": 65.7,
+    "teto_pct": 100.0,
+    "uso_do_teto_mediana": 0.21,
+    "amostras": 58
+  }
+}

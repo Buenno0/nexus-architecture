@@ -172,6 +172,25 @@ limpeza.
 observacao. A infraestrutura esta destruida desde 09/11/2026. O impacto sob carga real
 e tema da Fase 7.
 
+### Custo da campanha de carga (Fase 7)
+
+**US$ 0,00.** A campanha inteira rodou contra DynamoDB Local em container. Nenhum
+recurso AWS foi criado, e a conta segue sem infraestrutura desde 09/11/2026.
+
+A medicao na nuvem foi **considerada e recusada**, com a razao registrada aqui porque
+ela nao e de custo:
+
+> A conta tem cota de **10 execucoes Lambda concorrentes no total**. Qualquer numero de
+> vazao medido na AWS seria a cota, nao a arquitetura — com 10 concorrentes e ~100 ms
+> de latencia, o teto e ~100 req/s por construcao. Medir ali responderia "qual e a
+> cota da conta", pergunta cuja resposta ja esta no console.
+
+O que a AWS **poderia** responder, e que continua em aberto: forma da latencia com rede
+real e custo de cold start. Isso exige reimplantar a infraestrutura e caberia em menos
+de US$ 1,00 — cerca de US$ 0,57 de DynamoDB para 50 mil registros com trilha, o resto
+dentro da franquia. Fica para quando houver outra razao para subir a infraestrutura; a
+tabela de "Quanto custa um teste de carga" acima continua valendo como estimativa.
+
 ## Armadilhas identificadas
 
 Servicos que cobram **mesmo sem uso**:

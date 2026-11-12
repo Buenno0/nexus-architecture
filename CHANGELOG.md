@@ -6,6 +6,41 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Adicionado
 
+**Fase 7 — Performance Engineering**
+
+- **Arnes de carga** (`tools/loadtest.py`) que registra, alem da latencia, o delta dos
+  contadores, a profundidade de fila e outbox, os processos uvicorn contados dentro do
+  container e a saturacao do proprio gerador.
+- **Campanha com isolamento** (`tools/campanha.py`): zera tabela e fila antes de cada
+  corrida, porque sem isso a segunda medicao herda o acervo da primeira.
+- **Isolamento de cenario no Locust**, removendo a tarefa da lista em vez de faze-la
+  retornar cedo — uma tarefa que retorna sem fazer nada continua consumindo o turno do
+  usuario e o tempo de espera depois dele.
+- **Gargalo identificado com evidencia:** o caminho de escrita da ingestao. Com cada
+  caminho isolado, `replay` entrega 571,5 req/s, `duplicata` 247,8 e `novo` 103,8.
+- **Decomposicao do caminho de escrita:** nucleo 9 ms (56%), trilha da Fase 6 4 ms
+  (25%), publicacao na fila 4 ms (25%).
+- **Particao quente do `gsi_recency` fechada com numero:** item de 701 bytes, 1 WCU por
+  escrita, saturacao a 1.000 registros/s — com a ressalva de que a folga real sao 32%
+  no tamanho do item, nao a distancia entre 104 e 1.000.
+- `NEXUS_TRAIL_ENABLED` e `NEXUS_DYNAMO_MAX_POOL_CONNECTIONS`; tetos de CPU e
+  `--workers` por servico no `docker-compose.yml`.
+- Testes de concorrencia contra o **DynamoDB real**, nao so contra o repositorio falso.
+- `docs/performance/metodologia.md`, que documenta o metodo **e os erros que o
+  produziram**.
+
+### Corrigido
+
+- `/health` declarava `settings: SettingsDep` e sobrescrevia com `get_settings()` na
+  linha seguinte, anulando a injecao; `/metrics` fazia o mesmo com `environment` e
+  `list_records` nem declarava a dependencia.
+- `tests/unit/test_cors.py` registrava classes como override de dependencia — mesmo
+  defeito que a Fase 4 corrigiu em outro arquivo, dormente ate `/health` depender de
+  settings.
+- A contagem de processos uvicorn devolvia 1 em qualquer configuracao: com
+  `--workers N` os trabalhadores nascem de `multiprocessing` e a linha de comando deles
+  nao menciona uvicorn.
+
 **Fase 6 — Nexus Observability**
 
 - **Trilha durável atravessando processos**, chaveada por `record_id` na tabela base,

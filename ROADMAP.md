@@ -65,7 +65,7 @@ API de entrada com validacao, normalizacao, idempotencia e outbox transacional.
 - [x] **Validado na nuvem**: saude, autenticacao JWT, ingestao, consumo e resolucao
 - [x] **Destruido em 09/11/2026** — conta verificada limpa em 10 categorias
 - [ ] Dominio proprio e certificado ACM — Fase 4
-- [ ] Medicao sob carga — Fase 7
+- [ ] Medicao sob carga **na nuvem** — a Fase 7 mediu local; a AWS exige reaplicar a infraestrutura e aumentar a cota de concorrencia
 
 **Custo real dos tres dias no ar: US$ 0,0001.** Nenhum recurso remanescente.
 
@@ -132,7 +132,7 @@ Recall 1,0000 e precisao mantida apos o ajuste de `token_set_ratio`. Ver
 - [x] Toda escrita de observabilidade e best-effort e nunca derruba o observado
 - [x] 546 testes Python (92% em `observability`), 115 no dashboard
 - [ ] Amostragem pelo EventBridge Scheduler validada na nuvem — depende da Fase 3
-- [ ] Impacto das escritas de trilha sob carga — Fase 7
+- [x] Impacto das escritas de trilha sob carga — medido na Fase 7: **4 ms, 25% do caminho de ingestao**
 
 A verificacao achou seis defeitos, entre eles um numero que eu havia publicado no
 relatorio da Fase 4 sem verificar e um grafico que desmentia a propria legenda. Ver
@@ -144,13 +144,28 @@ ajuda para investigar, **nao um registro de auditoria**.
 
 ---
 
-## Fase 7 — Performance Engineering
+## Fase 7 — Performance Engineering  *(concluida, exceto a medicao na nuvem)*
 
-- [ ] Cenarios Locust por volume
-- [ ] Medicao de throughput e latencia
-- [ ] Testes de concorrencia
-- [ ] Relatorio em `docs/performance/`
-- [ ] Separacao explicita de cold start nas medicoes AWS
+- [x] Cenarios Locust por volume, com isolamento por caminho
+- [x] Medicao de throughput e latencia, sempre com P50, P95 e P99
+- [x] Testes de concorrencia contra o DynamoDB real
+- [x] **Gargalo identificado com evidencia**: o caminho de escrita da ingestao
+- [x] Decomposicao do custo: nucleo 56%, trilha 25%, publicacao 25%
+- [x] Particao quente do `gsi_recency` fechada com numero
+- [x] Repeticao e dispersao: nenhum numero comparativo vem de uma corrida so
+- [x] Relatorio e metodologia em `docs/performance/`
+- [x] Custo da campanha registrado em COSTS.md: **US$ 0,00**
+- [ ] Cold start quantificado — depende de reaplicar a infraestrutura AWS
+- [ ] Medicao sob rede real — idem, e exige aumento de cota de concorrencia
+
+**Teto por caminho:** `replay` 571,5 req/s · `duplicata` 247,8 · `novo` 103,8. Mesma
+pilha, mesmo processo: o limite e o trabalho de escrita, nao o custo de atender.
+
+A fase registrou **quatro erros meus de medicao** — conclusao tirada de uma corrida
+unica, alternancia que nao cancelava a deriva do acervo, isolamento de cenario que nao
+isolava, e custo de trabalho medido sob saturacao. Estao em
+[docs/testing/phase-7-report.md](docs/testing/phase-7-report.md), secao 6, porque sao o
+conteudo da fase e nao um apendice constrangedor.
 
 ---
 

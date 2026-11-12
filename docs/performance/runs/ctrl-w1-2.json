@@ -1,0 +1,109 @@
+{
+  "nome": "ctrl-w1-2",
+  "nota": "repeticao 2 com 1 processo(s), estado zerado antes",
+  "quando": "2026-11-11T23:27:12.691668+00:00",
+  "parametros": {
+    "usuarios": 200,
+    "taxa_de_subida": 50.0,
+    "duracao": "45s",
+    "decorrido_s": 45.5
+  },
+  "ambiente": {
+    "trail_enabled": true,
+    "api_workers": 1,
+    "environment": "local",
+    "registros_pre_carregados": 1000
+  },
+  "latencia": {
+    "agregado": {
+      "requisicoes": 4783,
+      "falhas": 0,
+      "rps": 108.45,
+      "media_ms": 1474.08,
+      "p50_ms": 1200.0,
+      "p95_ms": 3300.0,
+      "p99_ms": 5300.0,
+      "max_ms": 5566.24
+    },
+    "cenarios": {
+      "GET GET /v1/records": {
+        "requisicoes": 428,
+        "falhas": 0,
+        "rps": 9.7,
+        "media_ms": 624.1,
+        "p50_ms": 440.0,
+        "p95_ms": 1800.0,
+        "p99_ms": 4400.0,
+        "max_ms": 4700.9
+      },
+      "POST POST /v1/records/person [duplicata]": {
+        "requisicoes": 876,
+        "falhas": 0,
+        "rps": 19.86,
+        "media_ms": 1355.27,
+        "p50_ms": 1000.0,
+        "p95_ms": 3100.0,
+        "p99_ms": 5100.0,
+        "max_ms": 5182.72
+      },
+      "POST POST /v1/records/person [novo]": {
+        "requisicoes": 2447,
+        "falhas": 0,
+        "rps": 55.48,
+        "media_ms": 1800.33,
+        "p50_ms": 1500.0,
+        "p95_ms": 3400.0,
+        "p99_ms": 5400.0,
+        "max_ms": 5566.24
+      },
+      "POST POST /v1/records/person [replay]": {
+        "requisicoes": 832,
+        "falhas": 0,
+        "rps": 18.86,
+        "media_ms": 1206.09,
+        "p50_ms": 900.0,
+        "p95_ms": 2900.0,
+        "p99_ms": 5000.0,
+        "max_ms": 5074.95
+      }
+    },
+    "aquecimento": {
+      "requisicoes": 200,
+      "falhas": 0,
+      "rps": 4.53,
+      "media_ms": 936.56,
+      "p50_ms": 920.0,
+      "p95_ms": 1700.0,
+      "p99_ms": 1900.0,
+      "max_ms": 1912.31
+    }
+  },
+  "contadores_delta": {
+    "ingestion_accepted_total{record_type=person}": 2707,
+    "outbox_pending_total": 2707,
+    "outbox_dispatched_total": 2689,
+    "http_requests_total{method=POST,path=/v1/records/person,status=202}": 3525,
+    "ingestion_duplicate_total": 883,
+    "http_requests_total{method=POST,path=/v1/records/person,status=200}": 883,
+    "http_requests_total{method=GET,path=/v1/ops/queue,status=200}": 1,
+    "http_requests_total{method=GET,path=/v1/records,status=200}": 431,
+    "ingestion_replayed_total": 847
+  },
+  "fila": {
+    "antes": {
+      "pending": 0,
+      "in_flight": 0,
+      "dead": 0
+    },
+    "depois": {
+      "pending": 2775,
+      "in_flight": 0,
+      "dead": 0
+    }
+  },
+  "outbox": {
+    "antes": 0,
+    "depois": 22
+  },
+  "gerador_saturado": false
+}

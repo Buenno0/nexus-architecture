@@ -102,6 +102,13 @@ class Settings(BaseSettings):
         }
     )
 
+    #: Conexoes simultaneas no pool do cliente DynamoDB.
+    #:
+    #: O padrao do botocore e 10. A API atende chamadas bloqueantes num pool de
+    #: threads bem maior, entao acima de 10 operacoes simultaneas as conexoes passam a
+    #: ser descartadas e refeitas — o aviso "Connection pool is full" nos logs. Fase 7.
+    dynamo_max_pool_connections: int = Field(default=10, ge=1, le=256)
+
     # Observabilidade — Fase 6
     #: Desliga a gravacao de marcos da trilha.
     #:

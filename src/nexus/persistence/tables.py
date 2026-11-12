@@ -14,6 +14,7 @@ import time
 from typing import TYPE_CHECKING, Any, cast
 
 import boto3
+from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError, EndpointConnectionError
 
 from nexus.shared.config import Settings, get_settings
@@ -56,6 +57,9 @@ def build_client(settings: Settings | None = None) -> DynamoDBClient:
             kwargs["endpoint_url"] = settings.dynamo_endpoint
         kwargs["aws_access_key_id"] = LOCAL_FAKE_CREDENTIAL
         kwargs["aws_secret_access_key"] = LOCAL_FAKE_CREDENTIAL
+    kwargs["config"] = BotoConfig(
+        max_pool_connections=settings.dynamo_max_pool_connections,
+    )
     client: DynamoDBClient = boto3.client("dynamodb", **kwargs)
     return client
 

@@ -50,3 +50,7 @@ control-center/.env.local
 
 # Cache incremental do TypeScript — artefato de build, nao fonte.
 control-center/tsconfig.tsbuildinfo
+
+# Saida intermediaria do Locust. O resultado versionado e o JSON de cada corrida,
+# que o arnes monta a partir destes CSVs — eles sao o rascunho, nao o registro.
+docs/performance/runs/*.csv

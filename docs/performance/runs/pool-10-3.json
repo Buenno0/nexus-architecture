@@ -1,0 +1,75 @@
+{
+  "nome": "pool-10-3",
+  "nota": "repeticao 3, pool de 10 conexoes, cenario novo",
+  "quando": "2026-11-12T00:21:14.898094+00:00",
+  "parametros": {
+    "usuarios": 200,
+    "taxa_de_subida": 50.0,
+    "duracao": "45s",
+    "decorrido_s": 45.5
+  },
+  "ambiente": {
+    "trail_enabled": true,
+    "api_workers": 1,
+    "environment": "local",
+    "registros_pre_carregados": 1000
+  },
+  "latencia": {
+    "agregado": {
+      "requisicoes": 4079,
+      "falhas": 0,
+      "rps": 93.6,
+      "media_ms": 1748.75,
+      "p50_ms": 1500.0,
+      "p95_ms": 2900.0,
+      "p99_ms": 3300.0,
+      "max_ms": 3446.36
+    },
+    "cenarios": {
+      "POST POST /v1/records/person [novo]": {
+        "requisicoes": 3879,
+        "falhas": 0,
+        "rps": 89.01,
+        "media_ms": 1784.84,
+        "p50_ms": 1500.0,
+        "p95_ms": 2900.0,
+        "p99_ms": 3300.0,
+        "max_ms": 3446.36
+      }
+    },
+    "aquecimento": {
+      "requisicoes": 200,
+      "falhas": 0,
+      "rps": 4.59,
+      "media_ms": 1048.78,
+      "p50_ms": 1100.0,
+      "p95_ms": 1900.0,
+      "p99_ms": 2000.0,
+      "max_ms": 1980.55
+    }
+  },
+  "contadores_delta": {
+    "ingestion_accepted_total{record_type=person}": 4126,
+    "outbox_pending_total": 4126,
+    "outbox_dispatched_total": 4115,
+    "http_requests_total{method=POST,path=/v1/records/person,status=202}": 4100,
+    "http_requests_total{method=GET,path=/v1/ops/queue,status=200}": 1
+  },
+  "fila": {
+    "antes": {
+      "pending": 0,
+      "in_flight": 0,
+      "dead": 0
+    },
+    "depois": {
+      "pending": 4279,
+      "in_flight": 0,
+      "dead": 0
+    }
+  },
+  "outbox": {
+    "antes": 0,
+    "depois": 23
+  },
+  "gerador_saturado": false
+}

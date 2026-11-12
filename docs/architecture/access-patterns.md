@@ -123,8 +123,17 @@ Projecao `ALL`. O ULID ordena lexicograficamente por tempo de criacao, entao lis
 ordem cronologica inversa e `ScanIndexForward=False` — sem ordenacao em memoria.
 
 **Limitacao conhecida: particao quente.** Com PK por tipo, toda escrita de pessoas cai
-na mesma particao, limitada a 1.000 WCU/s na AWS. Nos volumes deste projeto
-(milhares de registros sob demanda) isso nao e alcancado.
+na mesma particao, limitada a 1.000 WCU/s na AWS.
+
+**Medido na Fase 7** (`tools/particao_quente.py`, sobre o serializador real): o item
+representativo tem **701 bytes**, entao a escrita no indice custa **1 WCU** e a
+particao satura a **1.000 registros/s**. A ingestao local atinge 104 req/s de registros
+novos, e a conta AWS limita a 10 execucoes Lambda concorrentes. A mitigacao por sharding
+continua desnecessaria — agora por numero, nao por intuicao.
+
+> A folga e menor do que a distancia entre 104 e 1.000 sugere. 701 bytes sao 68% de um
+> bloco de 1 KB: um payload um pouco mais rico passa de 1.024 bytes, a escrita vira
+> 2 WCU e o teto cai para 500 registros/s. A margem real esta no tamanho do item.
 
 Caminho de mitigacao, se necessario: `RECORDS#<tipo>#<shard>` com leitura em N shards e
 merge ordenado. Nao implementado agora porque adicionaria complexidade de paginacao sem

@@ -14,10 +14,26 @@ Resultados ficam em ``docs/performance/``. Numeros obtidos contra DynamoDB Local
 
 from __future__ import annotations
 
+import os
 import uuid
 from typing import Any
 
 from locust import HttpUser, between, task
+
+#: Restringe a carga a um unico cenario, via ``NEXUS_LOAD_SCENARIO``.
+#:
+#: Serve para medir **capacidade por caminho**. Com a mistura ponderada, o `rps` de
+#: cada cenario e o peso dele, nao o teto dele: um numero que parece capacidade e nao
+#: e. Isolar o caminho mais barato — o replay, que sai cedo com um unico `GetItem` —
+#: responde se o teto da plataforma vem do trabalho de ingestao ou do custo fixo de
+#: atender uma requisicao.
+#:
+#: O isolamento precisa **remover a tarefa da lista**, nao faze-la retornar cedo. Uma
+#: tarefa que retorna sem fazer nada continua consumindo um turno do usuario e o tempo
+#: de espera que vem depois dele. Na primeira tentativa foi isso que aconteceu: o
+#: "teto do replay" medido deu exatamente 2/11 da taxa de turnos, que e a aritmetica
+#: dos pesos e nao a capacidade de nada.
+CENARIO = os.environ.get("NEXUS_LOAD_SCENARIO", "").strip().lower()
 
 
 def pessoa(sufixo: str) -> dict[str, Any]:
@@ -75,3 +91,17 @@ class IngestionUser(HttpUser):
     @task(1)
     def listagem(self) -> None:
         self.client.get("/v1/records?limit=25", name="GET /v1/records")
+
+
+# Com um cenario escolhido, a classe passa a ter **apenas** aquela tarefa. O decorador
+# `@task` acima continua registrando todas; sobrescrever `tasks` substitui a lista.
+if CENARIO:
+    _POR_NOME = {
+        "novo": IngestionUser.registro_novo,
+        "duplicata": IngestionUser.conteudo_duplicado,
+        "replay": IngestionUser.replay,
+        "listagem": IngestionUser.listagem,
+    }
+    if CENARIO not in _POR_NOME:
+        raise SystemExit(f"NEXUS_LOAD_SCENARIO invalido: {CENARIO}")
+    IngestionUser.tasks = [_POR_NOME[CENARIO]]

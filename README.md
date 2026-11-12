@@ -20,7 +20,7 @@ processados de forma assincrona, correlacionados e monitorados.
 | Nexus Control Center | 4 | Implementado — 5 telas, roda local |
 | Nexus Entity Resolution | 5 | Implementado — precisao 1,000 / recall 1,000 em dados sinteticos |
 | Nexus Observability | 6 | Implementado — trilha durável, serie persistida, alertas calculados |
-| Performance Engineering | 7 | Nao iniciado |
+| Performance Engineering | 7 | Medido localmente — gargalo identificado; nuvem pendente |
 
 A plataforma roda localmente em Docker. Em 07/11/2026 foi implantada na AWS e
 validada ponta a ponta; em 09/11 foi **destruida**, deixando a conta limpa. Custo real
@@ -212,6 +212,37 @@ A trilha pode ter buracos e **nao serve como auditoria** — ver
 
 ---
 
+## Desempenho (Fase 7)
+
+Medido localmente. **Nao vale como previsao para a AWS** — ver
+[docs/performance/metodologia.md](docs/performance/metodologia.md).
+
+```bash
+make campaign
+```
+
+**Teto por caminho**, cada um isolado, 200 usuarios:
+
+| Caminho | Teto | O que faz |
+|---|---|---|
+| `replay` | 571,5 req/s | 1 `GetItem` e sai |
+| `duplicata` | 247,8 req/s | + `Query` no `gsi_natural` |
+| `novo` | 103,8 req/s | + transacao, trilha, publicacao |
+
+O gargalo e o **trabalho de escrita**, nao o custo de atender: o mesmo FastAPI entrega
+571 req/s quando nao precisa escrever. Dentro do caminho de escrita, o nucleo custa 9 ms
+(56%), a trilha da Fase 6 custa 4 ms (25%) e a publicacao na fila 4 ms (25%).
+
+O joelho da curva esta entre 10 e 50 usuarios simultaneos.
+
+> **Nenhum numero comparativo aqui vem de uma corrida so.** Repetindo a mesma
+> configuracao, a dispersao da vazao chega a 40% sob saturacao. Efeitos menores que isso
+> nao sao observaveis com uma corrida — e a Fase 7 tirou tres conclusoes erradas antes
+> de aprender isso. Estao registradas em
+> [docs/testing/phase-7-report.md](docs/testing/phase-7-report.md).
+
+---
+
 ## Dados sinteticos
 
 ```bash
@@ -232,6 +263,8 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - [docs/testing/phase-4-report.md](docs/testing/phase-4-report.md) — testes da Fase 4
 - [docs/testing/phase-5-report.md](docs/testing/phase-5-report.md) — testes e qualidade da Fase 5
 - [docs/testing/phase-6-report.md](docs/testing/phase-6-report.md) — testes da Fase 6
+- [docs/testing/phase-7-report.md](docs/testing/phase-7-report.md) — medicoes da Fase 7
+- [docs/performance/metodologia.md](docs/performance/metodologia.md) — como as medicoes foram feitas
 - [docs/performance/](docs/performance/) — medicoes
 - [docs/adr/](docs/adr/) — registros de decisao arquitetural
   - [ADR-001](docs/adr/ADR-001-dynamodb-local.md) — DynamoDB Local em vez de PostgreSQL
@@ -258,8 +291,10 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **Nao ha interface de revisao**, apenas endpoints. A tela e escopo da Fase 4.
 - **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
   culpada, mas reverte-la e manual.
-- **O comportamento sob carga na AWS nao foi medido** — latencia, throttling e cold
-  start no P99 sao escopo da Fase 7.
+- **O comportamento sob carga na AWS nao foi medido.** A Fase 7 mediu localmente; a
+  nuvem exige reaplicar a infraestrutura, e a conta tem cota de 10 execucoes
+  concorrentes, entao qualquer vazao medida la seria a cota e nao a arquitetura.
+- **Cold start nao foi quantificado** — depende do item acima.
 - **Nenhum dominio proprio configurado.**
 - **Parte do historico do dashboard ainda vive na aba.** A profundidade da plataforma
   passou a vir da serie persistida na Fase 6, mas as series de taxa das telas API e

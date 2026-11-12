@@ -24,6 +24,7 @@ from fastapi.testclient import TestClient
 from nexus.ingestion.api import app
 from nexus.persistence import get_repository
 from nexus.persistence.dynamo import DynamoRecordRepository
+from nexus.persistence.models import RecordType
 from nexus.queue import get_queue_client
 from nexus.queue.sqlite import SqliteQueue
 from nexus.queue.worker import Worker
@@ -86,9 +87,7 @@ class TestIdempotenciaSobConcorrencia:
         identificadores = {r.json()["record_id"] for r in respostas}
         assert len(identificadores) == 1
 
-        pagina = repository.list_records(
-            next(iter(respostas)).json()["record_type"], limit=100, cursor=None
-        )
+        pagina = repository.list_records(RecordType.PERSON, limit=100, cursor=None)
         assert len(pagina.items) == 1
 
     def test_nenhuma_requisicao_perde_a_corrida_com_erro(self, client: TestClient) -> None:

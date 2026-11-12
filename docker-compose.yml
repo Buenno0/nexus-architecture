@@ -47,6 +47,8 @@ services:
       NEXUS_FAILURE_INJECTION_RATE: ${NEXUS_FAILURE_INJECTION_RATE:-0.0}
       # Desliga a gravacao da trilha — ADR-010. A Fase 7 compara os dois lados.
       NEXUS_TRAIL_ENABLED: ${NEXUS_TRAIL_ENABLED:-true}
+      # Pool de conexoes do cliente DynamoDB. Padrao do botocore e 10 — Fase 7.
+      NEXUS_DYNAMO_MAX_POOL_CONNECTIONS: ${NEXUS_DYNAMO_MAX_POOL_CONNECTIONS:-10}
       # Credenciais falsas exigidas pelo SDK para falar com o DynamoDB Local.
       # Nao sao segredos — ver SECURITY.md.
       AWS_ACCESS_KEY_ID: local
