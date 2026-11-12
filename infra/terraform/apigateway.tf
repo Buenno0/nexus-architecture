@@ -48,8 +48,28 @@ locals {
     get_record   = "GET /v1/records/{record_id}"
     list_records = "GET /v1/records"
     metrics      = "GET /metrics"
-    ops          = "ANY /v1/ops/{proxy+}"
-    resolution   = "ANY /v1/resolution/{proxy+}"
+    # Metodo explicito, nunca ANY — e a diferenca entre o painel funcionar e nao.
+    #
+    # `ANY /v1/ops/{proxy+}` casa tambem com OPTIONS. O preflight do navegador passa
+    # a cair no authorizer JWT, e navegador **nunca** envia Authorization num
+    # preflight: a resposta e 401, o preflight reprova e a requisicao real nem sai.
+    # No console aparece como erro de CORS, o que manda investigar a configuracao de
+    # CORS — que esta correta. O problema e a rota.
+    #
+    # Com metodo explicito, OPTIONS nao casa com rota nenhuma e o proprio API Gateway
+    # responde o preflight com 204, que e como `GET /v1/records` sempre funcionou.
+    #
+    # Encontrado em 12/11/2026, na primeira vez que o painel falou com o gateway.
+    ops_read  = "GET /v1/ops/{proxy+}"
+    ops_write = "POST /v1/ops/{proxy+}"
+    res_read  = "GET /v1/resolution/{proxy+}"
+    res_write = "POST /v1/resolution/{proxy+}"
+
+    # Fase 6, ausente ate 12/11/2026. O mapa foi escrito na Fase 3; a Fase 6 criou as
+    # rotas na aplicacao com a infraestrutura ja destruida, entao o gateway nunca foi
+    # exercitado com elas. Os testes de integracao batem no FastAPI direto, e
+    # `terraform validate` valida sintaxe, nao cobertura de rotas.
+    observability = "GET /v1/observability/{proxy+}"
   }
 
   # Ingestao livre: o cliente escolhe o CONTEUDO do registro.

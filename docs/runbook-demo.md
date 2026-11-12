@@ -11,7 +11,7 @@ Ultima execucao: **12/11/2026**.
 |---|---|
 | Infraestrutura | **no ar** desde 12/11/2026 |
 | API | `https://1vsn0kmtx8.execute-api.us-east-1.amazonaws.com` |
-| Painel | **nao publicado** — pendente |
+| Painel | `https://nexus-architecture-buenno.vercel.app` |
 | Acervo | 300 registros semeados, 231 processados, 45 entidades, 10 revisoes pendentes |
 | Cota consumida | 300 de 5.000 |
 
@@ -91,7 +91,7 @@ A URL da Vercel so existe depois do passo 4, entao sao **dois applies**, nao um.
 eles, o painel nao fala com a API — o navegador recusa a resposta por origem.
 
 ```bash
-cd infra/terraform && terraform apply -var cors_allowed_origin=https://SEU-PROJETO.vercel.app
+cd infra/terraform && terraform apply -var cors_allowed_origin=https://nexus-architecture-buenno.vercel.app
 ```
 
 Melhor: gravar o valor em `terraform.tfvars` e aplicar sem `-var`, para o estado nao
@@ -106,6 +106,39 @@ cd infra/terraform && terraform destroy
 Procedimento de verificacao em dez categorias no [runbook-deploy.md](runbook-deploy.md).
 A Vercel se apaga pelo painel dela.
 
+## O nome do dominio
+
+`nexus-architecture.vercel.app` **nao e deste projeto**. Subdominios `*.vercel.app` sao
+globais e esse ja estava tomado por outra pessoa; a Vercel entao atribui o nome com o
+sufixo da conta. O endereco publico e
+`https://nexus-architecture-buenno.vercel.app`.
+
+Confundir os dois nao e inofensivo: o CORS chegou a ser apontado para o dominio alheio
+por alguns minutos. Nao houve exposicao — a API exige JWT em tudo menos `/health`, e
+aquele site nao tinha token —, mas a configuracao estava errada.
+
+Como confirmar de quem e um dominio antes de confiar nele:
+
+```bash
+curl -s https://nexus-architecture-buenno.vercel.app | grep -o '<title>[^<]*</title>'
+```
+
+O `<title>` do painel e `Nexus Control Center`. Se vier outra coisa, o dominio e de
+outro projeto.
+
+## Deployment Protection
+
+Ligada por padrao. Com ela, o dominio responde `302` para `vercel.com/sso-api` e so
+abre para quem esta logado na sua conta — um visitante bate na tela de login da Vercel.
+
+Settings -> Deployment Protection -> Vercel Authentication -> Disabled.
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://nexus-architecture-buenno.vercel.app
+```
+
+`200` significa publico; `302` significa protegido.
+
 ## Defeitos encontrados neste deploy
 
 **`USER_PASSWORD_AUTH` nao estava habilitado no client do Cognito.** O painel autentica
@@ -117,3 +150,27 @@ Encontrado sondando com uma senha **deliberadamente errada**: `InvalidParameterE
 significa flow desabilitado, `NotAuthorizedException` significa que o flow funciona e a
 senha e que esta errada. A distincao identifica o defeito sem usar a credencial real, e
 serve como verificacao depois da correcao.
+
+
+**As rotas de observabilidade nao existiam no API Gateway.** O mapa de rotas foi escrito
+na Fase 3; a Fase 6 criou `/v1/observability/*` na aplicacao com a infraestrutura ja
+destruida, entao o gateway nunca foi exercitado com elas. Os testes de integracao batem
+no FastAPI direto, e `terraform validate` valida sintaxe, nao cobertura de rotas.
+
+**`ANY` quebra o preflight de CORS.** `ANY /v1/ops/{proxy+}` casa tambem com `OPTIONS`,
+entao o preflight do navegador cai no authorizer JWT — e navegador **nunca** envia
+`Authorization` num preflight. Resposta `401`, preflight reprovado, requisicao real nem
+sai. Com metodo explicito (`GET` e `POST` separados), `OPTIONS` nao casa com rota nenhuma
+e o proprio API Gateway responde `204`.
+
+Os dois aparecem no console como **erro de CORS**, o que manda investigar a configuracao
+de CORS — que estava correta nas duas vezes. O sintoma aponta para o lugar errado.
+
+A verificacao que distingue os casos:
+
+```bash
+API=https://1vsn0kmtx8.execute-api.us-east-1.amazonaws.com; for r in /v1/ops/queue /v1/resolution/stats /v1/observability/alerts; do printf "%-34s preflight %s | real %s\n" "$r" "$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS "$API$r" -H 'Origin: https://nexus-architecture-buenno.vercel.app' -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: authorization')" "$(curl -s -o /dev/null -w '%{http_code}' "$API$r")"; done
+```
+
+Esperado: preflight `204` e real `401`. Preflight `401` e rota `ANY`; real `404` e rota
+ausente.

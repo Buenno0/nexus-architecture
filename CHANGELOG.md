@@ -20,6 +20,17 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/).
 
 ### Corrigido
 
+- **As rotas `/v1/observability/*` nao existiam no API Gateway.** O mapa de rotas e da
+  Fase 3; a Fase 6 criou as rotas na aplicacao com a infraestrutura ja destruida, entao
+  o gateway nunca foi exercitado com elas. Os testes de integracao batem no FastAPI
+  direto, e `terraform validate` valida sintaxe, nao cobertura de rotas.
+- **`ANY` no route_key quebra o preflight de CORS.** `ANY /v1/ops/{proxy+}` casa tambem
+  com `OPTIONS`, entao o preflight do navegador cai no authorizer JWT — e navegador
+  nunca envia `Authorization` num preflight. Resposta `401`, preflight reprovado,
+  requisicao real nem sai. Substituido por `GET` e `POST` explicitos, e ai o proprio
+  API Gateway responde o preflight com `204`.
+  Valia para `/v1/ops/*`, `/v1/resolution/*` e `/v1/observability/*` — tres telas do
+  painel sem dado nenhum.
 - **`USER_PASSWORD_AUTH` nao estava habilitado no client do Cognito**, e o painel
   autentica com esse flow. O login falharia com "flow not enabled for this client".
   Defeito latente desde a Fase 4, cujo relatorio ja registrava que o modo Cognito nunca
