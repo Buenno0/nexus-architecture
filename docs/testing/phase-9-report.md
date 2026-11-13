@@ -1,7 +1,7 @@
 # Fase 9 — Demonstracao publica
 
 Data: 2026-11-12
-Endereco: **https://nexus-architecture-buenno.vercel.app**
+Endereco: **https://nexus.mateus-bueno.dev**
 
 A fase tem uma particularidade: **tudo o que ela encontrou de defeito ja existia.** O
 codigo novo — rota de semeadura, tetos, login automatico — funcionou de primeira. O que
@@ -110,6 +110,20 @@ memoria e CPU andam juntas — cortaria desempenho tambem. Fica como pergunta ab
   fase foi manual, pelo navegador — e foi ela que achou os tres defeitos.
 - **A cota e consumida pela intencao de gerar**, nao pelo resultado: registros
   deduplicados tambem contam.
+
+## 6b. A rede de seguranca, observada
+
+Entre duas verificacoes a fila ficou com 80 mensagens aguardando, porque alguem gerou
+registros pelo painel e ninguem invocou o worker. Na verificacao seguinte o acervo
+tinha passado de 231 para 311 registros analisados, com a fila zerada.
+
+Ninguem drenou: foi o EventBridge Scheduler, a cada 15 minutos. E a rede de seguranca
+do [ADR-003](../adr/ADR-003-transactional-outbox.md) funcionando em producao — a
+garantia de retentativa da Fase 2 so vale se alguem consumir de novo, e esse "alguem"
+precisa existir quando ninguem esta olhando o painel.
+
+Nao foi um teste planejado. Foi o sistema fazendo o que esta escrito que faz, e o
+numero no painel mostrando.
 
 ## 7. Proximos passos
 

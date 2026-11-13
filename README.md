@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml/badge.svg)](https://github.com/Buenno0/nexus-architecture/actions/workflows/ci.yml)
 
-**Demonstracao ao vivo:** https://nexus-architecture-buenno.vercel.app — sem login, dados sinteticos, lendo o DynamoDB real.
+**Demonstracao ao vivo:** https://nexus.mateus-bueno.dev — sem login, dados sinteticos, lendo o DynamoDB real.
 
 > Engineering distributed systems, one component at a time.
 

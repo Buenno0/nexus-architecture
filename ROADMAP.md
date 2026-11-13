@@ -202,7 +202,7 @@ ultrapassava, de modo que os atos do alerta narravam um alarme que nunca acendeu
 
 ## Fase 9 — Demonstracao publica  *(concluida em 12/11/2026)*
 
-**https://nexus-architecture-buenno.vercel.app**
+**https://nexus.mateus-bueno.dev**
 
 Objetivo: um endereco que um interessado abre e **usa**, em vez de ler. A arquitetura
 favorece isso de um jeito que poucas favorecem — nada processa sozinho, entao o

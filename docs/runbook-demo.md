@@ -11,7 +11,7 @@ Ultima execucao: **12/11/2026**.
 |---|---|
 | Infraestrutura | **no ar** desde 12/11/2026 |
 | API | `https://1vsn0kmtx8.execute-api.us-east-1.amazonaws.com` |
-| Painel | `https://nexus-architecture-buenno.vercel.app` |
+| Painel | `https://nexus.mateus-bueno.dev` (dominio proprio, TLS pela Vercel) |
 | Acervo | 300 registros semeados, 231 processados, 45 entidades, 10 revisoes pendentes |
 | Cota consumida | 300 de 5.000 |
 
