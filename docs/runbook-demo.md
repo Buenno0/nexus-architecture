@@ -85,19 +85,48 @@ O intervalo de 30s nao e detalhe. No desenvolvimento ele e 3s, e uma unica aba v
 esquecida aberta geraria na ordem de 140.000 requisicoes por dia — mais que todos os
 visitantes somados.
 
-## 5. Corrigir a origem do CORS
+## 5. Dominio proprio (opcional)
+
+**Nao exige Route 53.** Uma versao anterior deste documento dava a hosted zone
+(US$ 0,50/mes) como custo inevitavel de ter dominio proprio — nao e. O DNS pode
+continuar no registrador, e a Vercel emite o certificado TLS sozinha. Com dominio
+proprio pela Vercel, o custo fixo continua **US$ 0,00**.
+
+O projeto usa `mateus-bueno.dev`, com DNS no name.com.
+
+1. Vercel: **Settings -> Domains -> Add**, informando `nexus.mateus-bueno.dev`. Ela
+   devolve o alvo de CNAME.
+2. No registrador: criar **CNAME** `nexus` apontando para esse alvo.
+3. Esperar a propagacao. O certificado e emitido automaticamente.
+
+```bash
+dig +short CNAME nexus.mateus-bueno.dev && curl -s -o /dev/null -w "%{http_code}\n" https://nexus.mateus-bueno.dev
+```
+
+**A alteracao de DNS e sempre do dono da conta.** Este runbook descreve o passo; nao o
+executa.
+
+## 6. Corrigir a origem do CORS
 
 A URL da Vercel so existe depois do passo 4, entao sao **dois applies**, nao um. Entre
 eles, o painel nao fala com a API — o navegador recusa a resposta por origem.
 
+`cors_allowed_origins` e uma **lista**, nao uma origem unica, e a razao e operacional:
+com uma origem so, apontar para o dominio novo derrubaria o antigo no instante do
+apply — e entre o apply e a propagacao do DNS nao haveria endereco nenhum funcionando.
+Com a lista, os dois valem ao mesmo tempo e a troca nao tem janela cega.
+
 ```bash
-cd infra/terraform && terraform apply -var cors_allowed_origin=https://nexus-architecture-buenno.vercel.app
+cd infra/terraform && terraform plan -out=tfplan && terraform apply tfplan
 ```
 
-Melhor: gravar o valor em `terraform.tfvars` e aplicar sem `-var`, para o estado nao
-depender de alguem lembrar da flag na proxima vez.
+O valor fica em `terraform.tfvars`, nunca em `-var` na linha de comando: o estado nao
+deve depender de alguem lembrar da flag na proxima vez.
 
-## 6. Destruir
+Curinga e recusado por validacao. Com `"*"`, qualquer pagina da internet chamaria a API
+pelo navegador de quem a visita — e as rotas `/v1/ops/*` disparam trabalho.
+
+## 7. Destruir
 
 ```bash
 cd infra/terraform && terraform destroy

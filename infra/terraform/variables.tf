@@ -140,10 +140,29 @@ variable "budget_notification_email" {
   type        = string
 }
 
-variable "cors_allowed_origin" {
-  description = "Origem do Control Center. Nunca use '*' com credenciais."
-  type        = string
-  default     = "https://nexus.mateus-bueno.dev"
+variable "cors_allowed_origins" {
+  description = <<-EOT
+    Origens do Control Center. **Nunca "*"**.
+
+    Lista, e nao uma origem so, porque o painel tem mais de um endereco legitimo ao
+    mesmo tempo: o dominio proprio e a URL da Vercel. Com uma origem unica, apontar
+    para o dominio novo derrubaria o antigo no mesmo instante — e entre o apply e a
+    propagacao do DNS nao haveria endereco nenhum funcionando.
+
+    Cada entrada e uma origem exata: esquema, host e porta. Nada de curinga.
+  EOT
+  type        = list(string)
+  default     = ["https://nexus.mateus-bueno.dev"]
+
+  validation {
+    condition     = !contains(var.cors_allowed_origins, "*")
+    error_message = "Curinga nao: com '*', qualquer pagina da internet chama a API do navegador de quem a visita."
+  }
+
+  validation {
+    condition     = length(var.cors_allowed_origins) > 0
+    error_message = "Informe ao menos uma origem."
+  }
 }
 
 variable "safety_net_schedule" {

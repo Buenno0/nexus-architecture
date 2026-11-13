@@ -239,10 +239,17 @@ recurso sera criado sem autorizacao explicita.
 | CloudWatch Logs | 5 GB/mes | < 500 MB | US$ 0 |
 | EventBridge Scheduler | nenhuma | 2.880/mes | ~US$ 0,004 |
 | Vercel | plano Hobby | 1 projeto | US$ 0 |
-| **Route 53** | nenhuma | 1 hosted zone | **US$ 0,50/mes — unico custo fixo** |
+| ~~Route 53~~ | — | **nao e necessario** | **US$ 0,00** |
 
-**Sem dominio proprio: US$ 0,05 a US$ 0,15/mes.** Com `nexus.mateus-bueno.dev`:
-**US$ 0,55 a US$ 0,65/mes**.
+**US$ 0,05 a US$ 0,15/mes, com ou sem dominio proprio.**
+
+> **Correcao (12/11/2026).** A versao anterior desta secao dava a hosted zone do
+> Route 53 (US$ 0,50/mes) como custo inevitavel de ter dominio proprio, e dizia que
+> ela era o unico custo fixo do projeto. **Estava errado.** O dominio e servido pela
+> Vercel, que emite o certificado TLS sozinha; o DNS continua no registrador. Route 53
+> so entraria se o DNS fosse movido para a AWS, e nao ha razao para mover.
+>
+> Com isso o projeto deixa de ter qualquer custo fixo: tudo o que resta e por uso.
 
 ### O maior custo recorrente nao sao os visitantes
 

@@ -5,8 +5,8 @@ resource "aws_apigatewayv2_api" "main" {
   protocol_type = "HTTP"
 
   cors_configuration {
-    # Nunca "*": a origem e exatamente a do Control Center.
-    allow_origins     = [var.cors_allowed_origin]
+    # Nunca "*": sao exatamente as origens do Control Center.
+    allow_origins     = var.cors_allowed_origins
     allow_methods     = ["GET", "POST", "OPTIONS"]
     allow_headers     = ["content-type", "authorization", "idempotency-key", "x-correlation-id"]
     expose_headers    = ["x-correlation-id", "idempotency-replayed"]

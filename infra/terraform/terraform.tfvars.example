@@ -6,8 +6,15 @@ environment = "dev"
 # Obrigatorio: recebe os alertas de orcamento.
 budget_notification_email = "voce@exemplo.com"
 
-# Origem do Control Center. Nunca "*".
-cors_allowed_origin = "https://nexus.mateus-bueno.dev"
+# Origens do Control Center. Nunca "*".
+#
+# Mais de uma porque o painel tem enderecos legitimos simultaneos: o dominio proprio e
+# a URL da Vercel. Com uma origem so, trocar de dominio derrubaria o antigo no instante
+# do apply, antes de o DNS novo propagar.
+cors_allowed_origins = [
+  "https://nexus.mateus-bueno.dev",
+  "https://nexus-architecture-buenno.vercel.app",
+]
 
 # PROVISIONED com 25 WCU/RCU fica na franquia gratuita (custo zero), mas estrangula
 # acima de 25 escritas/segundo. Troque para PAY_PER_REQUEST antes de testes de carga.
