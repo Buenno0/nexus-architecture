@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { descreverCobertura, paraPontos } from "./persisted";
+import { descreverCobertura, descreverGraficoVazio, paraPontos } from "./persisted";
 import type { Series } from "../api/types";
 
 const BASE: Series = {
@@ -45,12 +45,53 @@ describe("descreverCobertura", () => {
     const texto = descreverCobertura({
       ...BASE,
       gaps: 120,
-      points: [{ bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 1 } }],
+      points: [
+        { bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 1 } },
+        { bucket: "2026-11-10T12:00:15+00:00", values: { queue_pending: 2 } },
+      ],
     });
 
-    expect(texto).toMatch(/1 amostras/);
+    expect(texto).toMatch(/2 amostras/);
     expect(texto).toMatch(/nao foram medidos/);
     expect(texto).toMatch(/nao como zero/);
+  });
+
+  it("nao anuncia cobertura com uma amostra so, porque o grafico nao desenha", () => {
+    // A versao anterior dizia "1 amostras ... (0% da janela)" enquanto o grafico logo
+    // abaixo dizia "sem amostras na janela" — duas afirmacoes opostas na mesma caixa.
+    const serie = {
+      ...BASE,
+      gaps: 239,
+      points: [{ bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 1 } }],
+    };
+
+    expect(descreverCobertura(serie)).toMatch(/Uma amostra/);
+    expect(descreverCobertura(serie)).toMatch(/a partir da segunda/);
+    expect(descreverCobertura(serie)).not.toMatch(/amostras/);
+  });
+
+  it("a legenda e o texto do grafico nunca se contradizem", () => {
+    const umaSo = {
+      ...BASE,
+      gaps: 239,
+      points: [{ bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 1 } }],
+    };
+
+    expect(descreverGraficoVazio(umaSo)).toMatch(/Uma amostra so/);
+    expect(descreverGraficoVazio({ ...BASE, gaps: 240 })).toMatch(/Sem amostras/);
+  });
+
+  it("concorda o singular tambem nos baldes", () => {
+    const texto = descreverCobertura({
+      ...BASE,
+      gaps: 1,
+      points: [
+        { bucket: "2026-11-10T12:00:00+00:00", values: { queue_pending: 1 } },
+        { bucket: "2026-11-10T12:00:15+00:00", values: { queue_pending: 2 } },
+      ],
+    });
+
+    expect(texto).toMatch(/O balde restante nao foi medido/);
   });
 
   it("nao menciona buracos quando a janela esta completa", () => {

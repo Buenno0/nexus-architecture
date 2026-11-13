@@ -55,6 +55,22 @@ export function paraPontos(
  * A amostragem e oportunista: sem ninguem observando, nada e amostrado. Dizer isso e
  * melhor que desenhar uma reta sobre um periodo que ninguem mediu.
  */
+/** Plural simples. "1 amostras" num painel publico e descuido visivel. */
+function contar(n: number, singular: string, plural: string): string {
+  return `${n} ${n === 1 ? singular : plural}`;
+}
+
+/**
+ * Minimo de pontos para o grafico desenhar uma linha.
+ *
+ * Esta constante e o acordo entre a legenda e o desenho. Antes de existir, cada lado
+ * decidia sozinho quando havia serie: com exatamente uma amostra, a legenda anunciava
+ * cobertura e o grafico logo abaixo dizia "sem amostras na janela". Duas afirmacoes
+ * opostas na mesma caixa, num painel cujo principio e que todo numero diga a verdade
+ * sobre si.
+ */
+export const MINIMO_PARA_DESENHAR = 2;
+
 export function descreverCobertura(serie: Series | undefined): string {
   if (!serie) return "Carregando a serie persistida.";
   if (serie.points.length === 0) {
@@ -63,13 +79,31 @@ export function descreverCobertura(serie: Series | undefined): string {
       "A amostragem e oportunista: a serie so avanca quando alguem consulta a plataforma."
     );
   }
+  if (serie.points.length < MINIMO_PARA_DESENHAR) {
+    return (
+      `Uma amostra nos ultimos ${serie.window_minutes} minutos. ` +
+      "Uma so nao desenha linha: a serie comeca a aparecer a partir da segunda."
+    );
+  }
   const total = serie.points.length + serie.gaps;
   const cobertura = Math.round((serie.points.length / total) * 100);
   const base =
-    `${serie.points.length} amostras de ${serie.interval_seconds}s em ` +
+    `${contar(serie.points.length, "amostra", "amostras")} de ${serie.interval_seconds}s em ` +
     `${serie.window_minutes} minutos (${cobertura}% da janela).`;
   return serie.gaps === 0
     ? base
-    : `${base} Os ${serie.gaps} baldes restantes nao foram medidos e aparecem como ` +
+    : `${base} ${serie.gaps === 1 ? "O balde restante nao foi medido e aparece" : `Os ${serie.gaps} baldes restantes nao foram medidos e aparecem`} como ` +
         "interrupcao, nao como zero.";
+}
+
+/**
+ * Texto do grafico quando ele nao tem o que desenhar.
+ *
+ * Vem da mesma funcao que a legenda consulta, para os dois nunca se contradizerem.
+ */
+export function descreverGraficoVazio(serie: Series | undefined): string {
+  if (serie && serie.points.length > 0 && serie.points.length < MINIMO_PARA_DESENHAR) {
+    return "Uma amostra so: a linha comeca a ser desenhada a partir da segunda.";
+  }
+  return "Sem amostras na janela. A serie avanca quando a plataforma e consultada.";
 }

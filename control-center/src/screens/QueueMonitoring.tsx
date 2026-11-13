@@ -21,7 +21,11 @@ import { config } from "../api/config";
 import { semear } from "../api/queries";
 import type { ProgressoGeracao } from "../api/generator";
 import { somarPorNome } from "../metrics/parse";
-import { descreverCobertura, paraPontos } from "../metrics/persisted";
+import {
+  descreverCobertura,
+  descreverGraficoVazio,
+  paraPontos,
+} from "../metrics/persisted";
 
 const VOLUMES = [100, 1_000, 10_000] as const;
 /** Acima disso, gerar pede confirmacao: e trabalho em volume. */
@@ -204,7 +208,7 @@ export function QueueMonitoring() {
           ]}
           altura={240}
           eixoTemporal
-          vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
+          vazio={descreverGraficoVazio(serie.data)}
         />
       </Panel>
     </>

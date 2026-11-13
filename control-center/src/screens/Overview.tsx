@@ -13,7 +13,11 @@ import {
   useResolutionStats,
 } from "../api/queries";
 import { somarPorNome } from "../metrics/parse";
-import { descreverCobertura, paraPontos } from "../metrics/persisted";
+import {
+  descreverCobertura,
+  descreverGraficoVazio,
+  paraPontos,
+} from "../metrics/persisted";
 
 export function Overview() {
   const metrics = useMetrics();
@@ -151,7 +155,7 @@ export function Overview() {
             { chave: "outbox", rotulo: "outbox" },
           ]}
           eixoTemporal
-          vazio="Sem amostras na janela. A serie avanca quando a plataforma e consultada."
+          vazio={descreverGraficoVazio(serie.data)}
         />
       </Panel>
 
