@@ -185,7 +185,7 @@ export function Arquitetura() {
 
       <Panel
         titulo="O caminho de uma observacao"
-        descricao="A plataforma inteira num desenho so, com o fluxo em movimento. O ramo de falha comeca apagado — desenhar os dois com o mesmo peso diria que falhar e tao comum quanto dar certo."
+        descricao="Aperte play e acompanhe uma requisicao atravessando a plataforma. O ramo de falha so acende quando a requisicao passa por ele — desenhar os dois com o mesmo peso diria que falhar e tao comum quanto dar certo."
       >
         <Pipeline />
       </Panel>

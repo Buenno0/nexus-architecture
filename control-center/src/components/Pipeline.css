@@ -77,31 +77,65 @@
   font-size: 10.5px;
 }
 
-.flux__particula {
+/* O token e a requisicao que o visitante disparou. Um so, porque o que o sistema faz
+   e atender uma requisicao — particula em laco seria ambiente, nao evento. */
+.flux__token {
   fill: var(--info);
+  stroke: var(--fundo);
+  stroke-width: 2;
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.45, 0, 0.3, 1);
 }
 
-.flux__particula--erro {
+.flux__token--erro {
   fill: var(--erro);
 }
 
-/* O ramo de falha fica apagado ate alguem pedir para ve-lo: desenhar os dois caminhos
-   com o mesmo peso diria que falhar e tao comum quanto dar certo. */
+/* Parado na fila: pulsa em vez de andar, porque o correto ali e nao se mover. */
+.flux__token--espera {
+  animation: flux-espera 1.1s ease-in-out infinite;
+}
+
+@keyframes flux-espera {
+  50% {
+    r: 10;
+    opacity: 0.6;
+  }
+}
+
+/* O que a requisicao esta usando agora. */
+.flux__ativa .flux__aresta {
+  stroke: var(--info);
+  stroke-width: 2;
+}
+
+.flux__ativa .flux__caixa {
+  stroke: var(--info);
+  fill: var(--superficie-alta);
+}
+
+.flux--com-falha .flux__ativa .flux__aresta,
+.flux--com-falha .flux__ativa .flux__caixa {
+  stroke: var(--erro);
+}
+
+.flux__legenda-titulo {
+  display: block;
+  color: var(--texto);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  margin-bottom: 4px;
+}
+
+/* O ramo de falha fica apagado ate a requisicao passar por ele: desenhar os dois
+   caminhos com o mesmo peso diria que falhar e tao comum quanto dar certo. */
 .flux__falha {
-  opacity: 0.18;
+  opacity: 0.2;
   transition: opacity 320ms ease;
 }
 
 .flux--com-falha .flux__falha {
   opacity: 1;
-}
-
-.flux--com-falha .flux__falha .flux__aresta {
-  stroke: var(--erro);
-}
-
-.flux--com-falha .flux__falha .flux__caixa {
-  stroke: var(--erro);
 }
 
 .flux__legenda {
@@ -113,7 +147,7 @@
 }
 
 .flux__controles {
-  margin-top: calc(var(--espaco) * 2.5);
+  margin-bottom: calc(var(--espaco) * 2.5);
   display: flex;
   gap: var(--espaco);
   flex-wrap: wrap;
@@ -128,13 +162,12 @@
 
 /* Sem movimento, o desenho continua correto: as particulas somem e sobra o
    fluxograma. Nenhuma informacao vive so na animacao. */
+/* Sem movimento o percurso continua: o token salta de etapa em etapa, a legenda muda
+   e o destaque acompanha. Nenhuma informacao vive so na animacao. */
 @media (prefers-reduced-motion: reduce) {
-  .flux__particula {
-    display: none;
-  }
-
-  .flux__falha {
-    opacity: 1;
+  .flux__token {
+    transition-duration: 0ms !important;
+    animation: none;
   }
 }
 
