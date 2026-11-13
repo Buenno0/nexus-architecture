@@ -1,0 +1,126 @@
+/*
+ * Tela de arquitetura.
+ *
+ * Existe porque o painel abre em numeros, e numero sem contexto nao explica nada a
+ * quem chega agora. A estrutura — uma linha por mecanismo, micro-diagrama ao lado,
+ * legenda curta — e deliberadamente escaneavel: quem tiver quinze segundos le so os
+ * titulos e ja sabe do que o sistema trata.
+ *
+ * O estilo nao imita infografico de rede social: aqui o fundo e escuro e denso, como
+ * no resto do painel. Copiar um visual claro e serifado para dentro deste tema criaria
+ * um corpo estranho.
+ */
+
+.arq__intro {
+  max-width: 62ch;
+  margin-bottom: calc(var(--espaco) * 4);
+}
+
+.arq__titulo {
+  font-size: 1.75rem;
+  line-height: 1.2;
+  margin: 0 0 var(--espaco) 0;
+  color: var(--texto);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.arq__sub {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.arq__linha {
+  display: grid;
+  /* Coluna de texto limitada e desenho com largura generosa: sem o teto, numa tela
+     larga a linha de texto estica alem do confortavel de ler e o desenho — que e
+     metade da explicacao — encolhe para um canto. */
+  grid-template-columns: minmax(0, 1fr) 420px;
+  max-width: 1020px;
+  gap: calc(var(--espaco) * 5);
+  align-items: center;
+  padding: calc(var(--espaco) * 2.5) 0;
+  border-top: 1px solid var(--borda);
+}
+
+.arq__linha:first-of-type {
+  border-top: none;
+}
+
+.arq__nome {
+  margin: 0 0 4px 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--texto);
+}
+
+.arq__legenda {
+  margin: 0 0 6px 0;
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+}
+
+/* O "porque" fica em texto menor: quem escaneia le o titulo, quem se interessa le isto. */
+.arq__porque {
+  margin: 0;
+  max-width: 52ch;
+  color: var(--texto-fraco);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.arq__desenho {
+  width: 100%;
+  height: auto;
+}
+
+.arq__rotulo {
+  font-family: var(--mono);
+  font-size: 9px;
+  fill: var(--texto-fraco);
+}
+
+.arq__nota {
+  font-family: var(--sans);
+  font-size: 9.5px;
+  fill: var(--texto-suave);
+}
+
+/* Um unico elemento animado na tela inteira, na fila — e o unico mecanismo cuja ideia
+   depende de movimento: a mensagem espera e depois segue. */
+.arq__fluxo {
+  animation: arq-fluxo 3.2s linear infinite;
+}
+
+@keyframes arq-fluxo {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(150px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arq__fluxo {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .arq__linha {
+    grid-template-columns: minmax(0, 1fr);
+    gap: calc(var(--espaco) * 2);
+  }
+}

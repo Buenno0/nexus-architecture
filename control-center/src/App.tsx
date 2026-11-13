@@ -4,6 +4,7 @@ import "./App.css";
 import { config } from "./api/config";
 import { useAuth } from "./auth/provider";
 import { ApiMonitoring } from "./screens/ApiMonitoring";
+import { Arquitetura } from "./screens/Arquitetura";
 import { EntityResolution } from "./screens/EntityResolution";
 import { Login } from "./screens/Login";
 import { Overview } from "./screens/Overview";
@@ -14,6 +15,7 @@ import { AlertBanner } from "./components/AlertBanner";
 import { useAlerts, useHealth } from "./api/queries";
 
 const TELAS = [
+  { id: "arquitetura", rotulo: "Arquitetura", componente: Arquitetura },
   { id: "overview", rotulo: "Overview", componente: Overview },
   { id: "api", rotulo: "API", componente: ApiMonitoring },
   { id: "queue", rotulo: "Queue", componente: QueueMonitoring },
@@ -25,7 +27,9 @@ const TELAS = [
 type TelaId = (typeof TELAS)[number]["id"];
 
 export function App() {
-  const [tela, setTela] = useState<TelaId>("overview");
+  // Em modo demonstracao a primeira tela explica o sistema; no uso local, quem abre e
+  // o operador, que quer os numeros. O publico de cada ambiente e outro.
+  const [tela, setTela] = useState<TelaId>(config.demoMode ? "arquitetura" : "overview");
   const { autenticado, modo, usuario, sair } = useAuth();
   const health = useHealth(autenticado);
   // Depois da autenticacao: ver a docstring de useAlerts.
