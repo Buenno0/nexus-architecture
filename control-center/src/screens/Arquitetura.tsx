@@ -184,8 +184,8 @@ export function Arquitetura() {
       </div>
 
       <Panel
-        titulo="Veja acontecer"
-        descricao="Uma observacao atravessando a plataforma, passo a passo. A trilha se preenche enquanto dois processos diferentes a escrevem."
+        titulo="O caminho de uma observacao"
+        descricao="A plataforma inteira num desenho so, com o fluxo em movimento. O ramo de falha comeca apagado — desenhar os dois com o mesmo peso diria que falhar e tao comum quanto dar certo."
       >
         <Pipeline />
       </Panel>

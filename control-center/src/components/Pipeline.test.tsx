@@ -1,68 +1,48 @@
-import { act, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it } from "vitest";
 
 import { Pipeline } from "./Pipeline";
 
-beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
-
-/**
- * Avanca `passos` etapas.
- *
- * Um `act` por passo, de proposito: o efeito que agenda o proximo temporizador so roda
- * quando o `act` descarrega, entao um unico `advanceTimersByTime` longo avanca uma
- * etapa so, por mais tempo que se passe nele.
- */
-function avancarPassos(passos: number) {
-  for (let i = 0; i < passos; i += 1) {
-    act(() => {
-      vi.advanceTimersByTime(5_000);
-    });
-  }
-}
-
-describe("pipeline interativo", () => {
-  it("comeca parado, sem marco e sem etapa ativa", () => {
+describe("fluxograma da plataforma", () => {
+  it("tem alternativa textual carregando a mesma afirmacao da figura", () => {
+    // SVG sem nome acessivel e decoracao para quem usa leitor de tela — e este
+    // desenho carrega o mecanismo, nao enfeite.
     render(<Pipeline />);
-    expect(screen.getByText(/Aperte um dos botoes acima/)).toBeInTheDocument();
-    expect(screen.getByText(/Nenhum marco ainda/)).toBeInTheDocument();
+    const figura = screen.getByRole("img");
+    expect(figura.getAttribute("aria-label")).toMatch(/transacao/);
+    expect(figura.getAttribute("aria-label")).toMatch(/DLQ/);
+  });
+
+  it("o ramo de falha comeca apagado e so acende quando pedido", async () => {
+    // Desenhar os dois caminhos com o mesmo peso diria que falhar e tao comum
+    // quanto dar certo.
+    const { container } = render(<Pipeline />);
+    expect(container.querySelector(".flux")).not.toHaveClass("flux--com-falha");
+
+    await userEvent.click(screen.getByRole("button", { name: /Mostrar o caminho de falha/ }));
+
+    expect(container.querySelector(".flux")).toHaveClass("flux--com-falha");
   });
 
   it("declara que nao le o sistema", () => {
-    // O aviso nao e decorativo: animacao que parece medicao seria dado ficticio
-    // apresentado como real, que e o que a secao 7 do projeto proibe.
     render(<Pipeline />);
-    expect(screen.getByText(/nao uma leitura do sistema/)).toBeInTheDocument();
+    expect(screen.getByText(/nao le o sistema/)).toBeInTheDocument();
   });
 
-  it("grava os marcos na ordem, com o processo que emitiu cada um", () => {
-    render(<Pipeline />);
-    act(() => {
-      screen.getByText("Executar uma observacao").click();
-    });
-
-    expect(screen.getByText("accepted")).toBeInTheDocument();
-    avancarPassos(3);
-    expect(screen.getByText("published")).toBeInTheDocument();
-    avancarPassos(3);
-
-    const marcos = screen.getAllByText(/accepted|published|consumed|resolved/);
-    expect(marcos.map((m) => m.textContent?.replace(/api|worker|fila/g, ""))).toEqual([
-      "accepted",
-      "published",
-      "consumed",
-      "resolved",
-    ]);
+  it("toda aresta tem rotulo: seta sem rotulo e 'relacionado de algum jeito'", () => {
+    const { container } = render(<Pipeline />);
+    const arestas = container.querySelectorAll(".flux__aresta");
+    const rotulos = container.querySelectorAll(".flux__rotulo");
+    expect(arestas.length).toBeGreaterThan(0);
+    expect(rotulos).toHaveLength(arestas.length);
   });
 
-  it("o caminho de falha termina na DLQ, nao em resolved", () => {
-    render(<Pipeline />);
-    act(() => {
-      screen.getByText("Simular uma falha").click();
-    });
-    avancarPassos(8);
-
-    expect(screen.getByText("dead_lettered")).toBeInTheDocument();
-    expect(screen.queryByText("resolved")).not.toBeInTheDocument();
+  it("a espera na fila esta no desenho, nao so no texto", () => {
+    // keyPoints "0;0;1" e a pausa antes do movimento: a mensagem publicada que
+    // ainda nao foi consumida.
+    const { container } = render(<Pipeline />);
+    const pausas = container.querySelectorAll('animateMotion[keyPoints="0;0;1"]');
+    expect(pausas).toHaveLength(1);
   });
 });

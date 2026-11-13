@@ -1,287 +1,202 @@
 /**
- * Uma observacao atravessando a plataforma, passo a passo.
+ * Fluxograma animado: o caminho de uma observacao pela plataforma.
  *
- * **Nada aqui consulta a API.** E a explicacao do mecanismo em movimento, nao leitura
- * do estado real — e a tela diz isso em texto, porque numero simulado apresentado como
- * medicao e precisamente o que a secao 7 do projeto proibe. Os numeros reais estao nas
- * outras abas, cada um com a origem rotulada.
+ * Uma figura, uma afirmacao — **o caminho e assincrono e nenhuma falha perde o
+ * registro**. Por isso o desenho traz a transacao, a publicacao, a fila, o worker, a
+ * recuperacao pelo outbox e a DLQ, e deixa de fora o que nao sustenta essa afirmacao:
+ * idempotencia, resolucao e trilha tem explicacao propria logo abaixo, cada uma com o
+ * seu desenho.
  *
- * Movimento foi a escolha certa aqui por um motivo especifico: as tres ideias mais
- * dificeis de transmitir sao temporais. A espera na fila, o intervalo crescente entre
- * retentativas e a trilha sendo escrita por dois processos diferentes viram setas num
- * desenho estatico, e seta nao distingue "imediato" de "oito segundos depois".
+ * O movimento carrega o que desenho parado nao carrega. Tres ideias do sistema sao
+ * temporais — a mensagem que espera antes de ser consumida, o caminho de falha que so
+ * acontece as vezes, e a rede de seguranca que so entra em acao quando a publicacao
+ * direta falhou. Seta nao distingue "imediato" de "depois"; particula distingue.
+ *
+ * SVG escrito a mao, sem biblioteca e sem script: a animacao e SMIL (`animateMotion`),
+ * nativa do formato. **Nada aqui le a API** — os numeros reais estao nas outras abas,
+ * cada um com a origem rotulada.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import "./Pipeline.css";
-import { OpButton } from "./OpButton";
 
-type Servico = "api" | "worker" | "fila";
-
-interface Etapa {
+interface No {
+  id: string;
+  x: number;
+  y: number;
   nome: string;
-  onde: Servico;
-  titulo: string;
-  texto: string;
-  /** Marco gravado na trilha ao entrar nesta etapa — ADR-010. */
-  marco?: string;
-  /** Pausa antes da proxima etapa. A da fila e maior de proposito: e a espera. */
-  duracaoMs: number;
-  espera?: boolean;
-  erro?: boolean;
+  papel: string;
+  externo?: boolean;
+  falha?: boolean;
 }
 
-const FELIZ: Etapa[] = [
-  {
-    nome: "aceita",
-    onde: "api",
-    titulo: "POST /v1/records/person",
-    texto:
-      "Chega com Idempotency-Key. A mesma chave nunca produz duas observacoes: a repeticao devolve a resposta guardada, sem efeito novo.",
-    marco: "accepted",
-    duracaoMs: 1100,
-  },
-  {
-    nome: "valida",
-    onde: "api",
-    titulo: "Validacao na borda",
-    texto:
-      "Pydantic recusa payload invalido aqui, com 422. Nada invalido alcanca a persistencia, e o resto do sistema fica livre de verificacoes defensivas espalhadas.",
-    duracaoMs: 1000,
-  },
-  {
-    nome: "grava",
-    onde: "api",
-    titulo: "TransactWriteItems",
-    texto:
-      "Observacao, evento de outbox e registro de idempotencia numa unica transacao. Ou os tres existem, ou nenhum — e o que impede o registro salvo e nunca processado.",
-    duracaoMs: 1300,
-  },
-  {
-    nome: "publica",
-    onde: "api",
-    titulo: "Publicacao na fila",
-    texto:
-      "Best-effort: se falhar, o evento continua pendente num indice esparso e o despachante o recupera depois. Perder o evento seria inaceitavel; publica-lo duas vezes, nao.",
-    marco: "published",
-    duracaoMs: 1200,
-  },
-  {
-    nome: "espera",
-    onde: "fila",
-    titulo: "A mensagem aguarda",
-    texto:
-      "Nada acontece aqui — e esse nada e o diagnostico. O tempo entre 'published' e 'consumed' e espera na fila, e nenhuma otimizacao do processador o recupera. E por isso que a trilha mede o intervalo entre marcos, nao so o total.",
-    duracaoMs: 2600,
-    espera: true,
-  },
-  {
-    nome: "consome",
-    onde: "worker",
-    titulo: "Worker consome o lote",
-    texto:
-      "Outro processo, outro log. Antes de processar, consulta o marcador: reentrega encontra o marcador e nao processa de novo. A entrega e at-least-once por construcao.",
-    marco: "consumed",
-    duracaoMs: 1300,
-  },
-  {
-    nome: "resolve",
-    onde: "worker",
-    titulo: "Resolucao de identidade",
-    texto:
-      "Blocking seleciona candidatos, o score compara campo a campo, e a decisao tem tres faixas. Em duvida, vai para revisao humana — nunca funde no palpite.",
-    marco: "resolved",
-    duracaoMs: 1400,
-  },
+const L = 136;
+const A = 52;
+
+const NOS: No[] = [
+  { id: "cliente", x: 10, y: 36, nome: "cliente", papel: "FONTE", externo: true },
+  { id: "api", x: 250, y: 36, nome: "API", papel: "INGESTAO" },
+  { id: "dynamo", x: 640, y: 36, nome: "DynamoDB", papel: "ARMAZENAMENTO" },
+  { id: "fila", x: 250, y: 180, nome: "fila", papel: "SQS" },
+  { id: "worker", x: 450, y: 180, nome: "worker", papel: "CONSUMO" },
+  { id: "resolucao", x: 640, y: 180, nome: "resolucao", papel: "IDENTIDADE" },
+  { id: "dlq", x: 450, y: 320, nome: "DLQ", papel: "FALHA", falha: true },
 ];
 
-const FALHA: Etapa[] = [
-  ...FELIZ.slice(0, 5),
+interface Aresta {
+  d: string;
+  rotulo: string;
+  rx: number;
+  ry: number;
+  ancora?: "start" | "middle" | "end";
+  recuperacao?: boolean;
+  falha?: boolean;
+}
+
+const ARESTAS: Aresta[] = [
+  { d: "M146,62 H242", rotulo: "POST", rx: 194, ry: 52 },
+  { d: "M386,62 H632", rotulo: "TransactWriteItems", rx: 509, ry: 52 },
+  { d: "M300,88 V172", rotulo: "publica", rx: 292, ry: 136, ancora: "end" },
   {
-    nome: "falha",
-    onde: "worker",
-    titulo: "1a tentativa falha",
-    texto:
-      "O processamento levanta erro. A mensagem nao e confirmada e volta a ficar visivel na fila depois do prazo de visibilidade.",
-    marco: "failed",
-    duracaoMs: 1300,
-    erro: true,
+    d: "M660,88 V140 H336 V172",
+    rotulo: "outbox pendente, despachante recupera",
+    rx: 500,
+    ry: 132,
+    recuperacao: true,
   },
-  {
-    nome: "retenta",
-    onde: "fila",
-    titulo: "2a e 3a tentativas",
-    texto:
-      "Backoff exponencial: cada retentativa espera mais que a anterior. Sem isso, um erro persistente vira um laco apertado que consome a fila inteira.",
-    duracaoMs: 2400,
-    espera: true,
-    erro: true,
-  },
-  {
-    nome: "DLQ",
-    onde: "fila",
-    titulo: "Dead letter queue",
-    texto:
-      "Esgotadas as tentativas, a mensagem sai do caminho quente e fica na DLQ: visivel, inspecionavel e devolvivel por um redrive explicito. Ela nao some — e um alerta acende sozinho.",
-    marco: "dead_lettered",
-    duracaoMs: 1500,
-    erro: true,
-  },
+  { d: "M386,206 H442", rotulo: "consome", rx: 414, ry: 196 },
+  { d: "M586,206 H632", rotulo: "resolve", rx: 609, ry: 196 },
+  { d: "M708,180 V96", rotulo: "vincula", rx: 716, ry: 140, ancora: "start" },
+  { d: "M518,232 V312", rotulo: "3 falhas", rx: 526, ry: 276, ancora: "start", falha: true },
+  { d: "M450,346 H286 V234", rotulo: "redrive", rx: 366, ry: 338, falha: true },
 ];
 
-interface Marco {
-  nome: string;
-  servico: Servico;
-  erro: boolean;
+interface Particula {
+  caminho: string;
+  dur: string;
+  inicio: string;
+  /** Pausa no comeco do percurso: e a espera na fila, nao um atraso de animacao. */
+  espera?: boolean;
+  falha?: boolean;
+}
+
+const PARTICULAS: Particula[] = [
+  { caminho: "M146,62 H242", dur: "1.7s", inicio: "0s" },
+  { caminho: "M386,62 H632", dur: "2.1s", inicio: "0.5s" },
+  { caminho: "M300,88 V172", dur: "1.5s", inicio: "1.1s" },
+  { caminho: "M660,88 V140 H336 V172", dur: "3.4s", inicio: "2.6s" },
+  { caminho: "M386,206 H442", dur: "3.2s", inicio: "1.6s", espera: true },
+  { caminho: "M586,206 H632", dur: "1.4s", inicio: "2.4s" },
+  { caminho: "M708,180 V96", dur: "1.8s", inicio: "3.1s" },
+  { caminho: "M518,232 V312", dur: "2.2s", inicio: "0.2s", falha: true },
+  { caminho: "M450,346 H286 V234", dur: "2.8s", inicio: "2.2s", falha: true },
+];
+
+function Caixa({ no }: { no: No }) {
+  return (
+    <g className={no.falha ? "flux__falha" : undefined}>
+      <rect
+        x={no.x}
+        y={no.y}
+        width={L}
+        height={A}
+        rx="9"
+        className={`flux__caixa ${no.externo ? "flux__caixa--externa" : ""}`}
+      />
+      <text x={no.x + L / 2} y={no.y + 24} textAnchor="middle" className="flux__nome">
+        {no.nome}
+      </text>
+      <text x={no.x + L / 2} y={no.y + 40} textAnchor="middle" className="flux__papel">
+        {no.papel}
+      </text>
+    </g>
+  );
 }
 
 export function Pipeline() {
-  const [roteiro, setRoteiro] = useState<Etapa[]>(FELIZ);
-  const [indice, setIndice] = useState(-1);
-  const [marcos, setMarcos] = useState<Marco[]>([]);
-  const [rodando, setRodando] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-
-  const parar = useCallback(() => {
-    if (timer.current !== undefined) window.clearTimeout(timer.current);
-    timer.current = undefined;
-  }, []);
-
-  // Um unico efeito conduz a sequencia. Agendar o proximo passo de dentro do
-  // callback anterior criaria uma cadeia que o unmount nao cancela.
-  useEffect(() => {
-    if (indice < 0 || indice >= roteiro.length) return;
-    const etapa = roteiro[indice];
-    if (!etapa) return;
-    if (etapa.marco) {
-      setMarcos((atuais) => [
-        ...atuais,
-        { nome: etapa.marco as string, servico: etapa.onde, erro: etapa.erro ?? false },
-      ]);
-    }
-    if (indice === roteiro.length - 1) return;
-    timer.current = window.setTimeout(() => setIndice((i) => i + 1), etapa.duracaoMs);
-    return parar;
-  }, [indice, roteiro, parar]);
-
-  useEffect(() => parar, [parar]);
-
-  // Devolve uma promessa que resolve quando a sequencia termina: e assim que o
-  // OpButton sabe mostrar "executando…" e voltar sozinho ao fim, sem eu duplicar o
-  // controle de estado do botao aqui dentro.
-  function executar(novo: Etapa[]): Promise<void> {
-    parar();
-    setRoteiro(novo);
-    setMarcos([]);
-    setIndice(0);
-    const total = novo.reduce((soma, e) => soma + e.duracaoMs, 0);
-    return new Promise((resolver) => {
-      window.setTimeout(() => {
-        setRodando(false);
-        resolver();
-      }, total);
-    });
-  }
-
-  const etapa = indice >= 0 ? roteiro[indice] : undefined;
-  const posicao = `${((Math.max(indice, 0) + 0.5) / roteiro.length) * 100}%`;
+  const [mostrarFalha, setMostrarFalha] = useState(false);
 
   return (
-    <div className="pipe">
-      <div className="pipe__controles">
-        <OpButton
-          rotulo="Executar uma observacao"
-          onExecutar={() => {
-            setRodando(true);
-            return executar(FELIZ);
-          }}
-          desabilitado={rodando}
-          dica="Percorre o caminho feliz, da chamada HTTP ate a decisao de identidade."
-        />
-        <OpButton
-          rotulo="Simular uma falha"
-          onExecutar={() => {
-            setRodando(true);
-            return executar(FALHA);
-          }}
-          desabilitado={rodando}
-          variante="perigo"
-          dica="Mesmo inicio, mas o processamento falha: retentativa com backoff e DLQ."
-        />
-      </div>
+    <div className={`flux ${mostrarFalha ? "flux--com-falha" : ""}`}>
+      <figure>
+        <p className="flux__rolar">Arraste o desenho para o lado para ver o fluxo inteiro.</p>
+        <div className="flux__rolagem">
+        <svg
+          viewBox="0 0 980 400"
+          className="flux__svg"
+          role="img"
+          aria-label="Fluxograma: o cliente chama a API, que grava registro e evento numa unica transacao e publica na fila; o worker consome e resolve a identidade. Se a publicacao falhar, o despachante recupera o evento pendente; se o processamento falhar tres vezes, a mensagem vai para a DLQ e volta por redrive."
+        >
+          <defs>
+            <marker id="flux-seta" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L8,4 L0,8 z" fill="currentColor" />
+            </marker>
+          </defs>
 
-      <div className="pipe__trilho">
-        {roteiro.map((e, i) => (
-          <div
-            key={e.nome}
-            className={[
-              "pipe__etapa",
-              i < indice ? "pipe__etapa--feita" : "",
-              i === indice ? "pipe__etapa--ativa" : "",
-              e.erro ? "pipe__etapa--falha" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <span className="pipe__nome">{e.nome}</span>
-            <span className="pipe__onde">{e.onde}</span>
-          </div>
-        ))}
-        <span
-          className={[
-            "pipe__token",
-            indice < 0 ? "pipe__token--parado" : "",
-            etapa?.espera ? "pipe__token--esperando" : "",
-            etapa?.erro ? "pipe__token--falha" : "",
-          ]
-            .filter(Boolean)
-            .join(" ")}
-          style={{ "--pos": posicao } as React.CSSProperties}
-          aria-hidden="true"
-        />
-      </div>
-
-      <div
-        className={`pipe__legenda ${etapa?.erro ? "pipe__legenda--falha" : ""}`}
-        aria-live="polite"
-      >
-        <p className="pipe__legenda-titulo">
-          {etapa ? etapa.titulo : "Aperte um dos botoes acima"}
-        </p>
-        <p className="pipe__legenda-texto">
-          {etapa
-            ? etapa.texto
-            : "A sequencia percorre o caminho real de um registro, da chamada HTTP ate a decisao de identidade — ou ate a DLQ, se voce escolher a falha."}
-        </p>
-      </div>
-
-      <div className="pipe__trilha">
-        <div className="pipe__trilha-titulo">
-          Trilha — marcos gravados, com o processo que emitiu cada um
-        </div>
-        <div className="pipe__marcos">
-          {marcos.length === 0 && (
-            <span className="pipe__legenda-texto">
-              Nenhum marco ainda.
-            </span>
-          )}
-          {marcos.map((m) => (
-            <span
-              key={m.nome}
-              className={`pipe__marco ${m.erro ? "pipe__marco--erro" : ""}`}
-            >
-              {m.nome}
-              <span className="pipe__marco-servico">{m.servico}</span>
-            </span>
+          {ARESTAS.map((a) => (
+            <g key={a.rotulo} className={a.falha ? "flux__falha" : undefined}>
+              <path
+                d={a.d}
+                className={`flux__aresta ${a.recuperacao ? "flux__aresta--recuperacao" : ""}`}
+                markerEnd="url(#flux-seta)"
+              />
+              <text x={a.rx} y={a.ry} textAnchor={a.ancora ?? "middle"} className="flux__rotulo">
+                {a.rotulo}
+              </text>
+            </g>
           ))}
+
+          {NOS.map((n) => (
+            <Caixa key={n.id} no={n} />
+          ))}
+
+          {PARTICULAS.map((p) => (
+            <circle
+              key={p.caminho + p.inicio}
+              r="4.5"
+              className={`flux__particula ${p.falha ? "flux__particula--erro" : ""} ${p.falha ? "flux__falha" : ""}`}
+            >
+              <animateMotion
+                dur={p.dur}
+                begin={p.inicio}
+                repeatCount="indefinite"
+                path={p.caminho}
+                calcMode="linear"
+                // A pausa no inicio do percurso e a espera na fila: a mensagem ja foi
+                // publicada e ainda nao foi consumida. E o unico trecho do desenho em
+                // que o correto e nao se mover.
+                {...(p.espera
+                  ? { keyTimes: "0;0.45;1", keyPoints: "0;0;1" }
+                  : { keyTimes: "0;1", keyPoints: "0;1" })}
+              />
+            </circle>
+          ))}
+        </svg>
         </div>
+        <figcaption className="flux__legenda">
+          O caminho e assincrono de ponta a ponta, e nenhuma falha perde o registro. A
+          transacao grava observacao e evento juntos — ou os dois, ou nenhum. A
+          publicacao na fila e best-effort: quando ela falha, o evento continua pendente
+          num indice esparso e o despachante o recupera. E se o processamento falhar
+          tres vezes, a mensagem vai para a DLQ, onde fica visivel e devolvivel, em vez
+          de sumir.
+        </figcaption>
+      </figure>
+
+      <div className="flux__controles">
+        <button
+          type="button"
+          className={`op op--${mostrarFalha ? "perigo" : "normal"}`}
+          onClick={() => setMostrarFalha((v) => !v)}
+        >
+          {mostrarFalha ? "Ocultar o caminho de falha" : "Mostrar o caminho de falha"}
+        </button>
       </div>
 
-      <p className="pipe__aviso">
-        Esta animacao e uma explicacao do mecanismo, nao uma leitura do sistema. Nenhum
-        numero aqui vem da API — os reais estao nas outras abas, cada um com a origem
-        rotulada.
+      <p className="flux__aviso">
+        Este desenho explica o mecanismo; nao le o sistema. Nenhum numero aqui vem da
+        API — os reais estao nas outras abas, cada um com a origem rotulada.
       </p>
     </div>
   );

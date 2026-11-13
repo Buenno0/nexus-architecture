@@ -20,8 +20,9 @@ describe("tela de arquitetura", () => {
     // SVG sem alternativa textual e decoracao para quem usa leitor de tela, e estes
     // desenhos carregam a explicacao, nao enfeite.
     render(<Arquitetura />);
+    // Seis: o fluxograma animado no topo, mais um por mecanismo.
     const desenhos = screen.getAllByRole("img");
-    expect(desenhos).toHaveLength(5);
+    expect(desenhos).toHaveLength(6);
     for (const d of desenhos) {
       expect(d.getAttribute("aria-label")?.length ?? 0).toBeGreaterThan(20);
     }
