@@ -1,0 +1,230 @@
+/*
+ * Pipeline interativo.
+ *
+ * Existe porque movimento e a unica coisa que diagrama parado nao mostra. A espera na
+ * fila, a retentativa com intervalo crescente e a trilha se preenchendo enquanto dois
+ * processos diferentes a escrevem sao ideias temporais: num desenho estatico viram
+ * setas, e setas nao distinguem "rapido" de "demorado".
+ *
+ * Nada aqui consulta a API. E uma explicacao animada do mecanismo, nao uma leitura do
+ * estado real — e o rotulo na tela diz isso, porque numero simulado apresentado como
+ * medicao e exatamente o que a secao 7 do projeto proibe.
+ */
+
+.pipe {
+  --altura-trilho: 86px;
+}
+
+.pipe__controles {
+  display: flex;
+  gap: var(--espaco);
+  flex-wrap: wrap;
+  margin-bottom: calc(var(--espaco) * 3);
+}
+
+.pipe__trilho {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--espaco);
+  min-height: var(--altura-trilho);
+}
+
+.pipe__etapa {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: calc(var(--espaco) * 1.5) 4px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  text-align: center;
+  transition:
+    border-color 220ms ease,
+    background 220ms ease,
+    opacity 220ms ease;
+  opacity: 0.45;
+}
+
+.pipe__etapa--feita {
+  opacity: 0.8;
+  border-color: var(--borda-forte);
+}
+
+.pipe__etapa--ativa {
+  opacity: 1;
+  border-color: var(--info);
+  background: var(--superficie-alta);
+}
+
+.pipe__etapa--falha.pipe__etapa--ativa {
+  border-color: var(--erro);
+}
+
+.pipe__nome {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--texto);
+  letter-spacing: 0.02em;
+}
+
+.pipe__onde {
+  font-size: 0.65rem;
+  color: var(--texto-fraco);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* O token: a observacao atravessando. Posicao vem do React em --pos, porque dividir
+   por uma variavel dentro de calc() nao e confiavel entre navegadores. */
+.pipe__token {
+  position: absolute;
+  top: -7px;
+  left: var(--pos, 0%);
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--info);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--info) 25%, transparent);
+  transition: left 620ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.pipe__token--falha {
+  background: var(--erro);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--erro) 25%, transparent);
+}
+
+.pipe__token--parado {
+  opacity: 0;
+}
+
+/* A espera na fila e a unica etapa em que o token pulsa em vez de andar: e o momento
+   em que nada acontece, e esse "nada" e o diagnostico. */
+.pipe__token--esperando {
+  animation: pipe-espera 1s ease-in-out infinite;
+}
+
+@keyframes pipe-espera {
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in srgb, var(--info) 10%, transparent);
+  }
+}
+
+.pipe__legenda {
+  margin-top: calc(var(--espaco) * 3);
+  min-height: 4.5em;
+  padding: calc(var(--espaco) * 2);
+  border-left: 2px solid var(--info);
+  background: var(--superficie);
+  border-radius: 0 var(--raio) var(--raio) 0;
+}
+
+.pipe__legenda--falha {
+  border-left-color: var(--erro);
+}
+
+.pipe__legenda-titulo {
+  margin: 0 0 4px 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--texto);
+}
+
+.pipe__legenda-texto {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--texto-suave);
+}
+
+.pipe__trilha {
+  margin-top: calc(var(--espaco) * 3);
+}
+
+.pipe__trilha-titulo {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--texto-fraco);
+  margin-bottom: var(--espaco);
+}
+
+.pipe__marcos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--espaco);
+  min-height: 30px;
+}
+
+.pipe__marco {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--borda-forte);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--texto-suave);
+  background: var(--superficie);
+  animation: pipe-marco 260ms ease-out;
+}
+
+@keyframes pipe-marco {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.pipe__marco-servico {
+  font-size: 0.6rem;
+  color: var(--texto-fraco);
+  text-transform: uppercase;
+}
+
+.pipe__marco--erro {
+  border-color: var(--erro);
+  color: var(--erro);
+}
+
+.pipe__aviso {
+  margin-top: calc(var(--espaco) * 2);
+  font-size: 0.75rem;
+  color: var(--texto-fraco);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pipe__token,
+  .pipe__marco {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .pipe__trilho {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+  }
+
+  .pipe__etapa {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--espaco);
+    padding: var(--espaco) calc(var(--espaco) * 1.5);
+  }
+
+  /* Na vertical o token acompanha a coluna, nao a linha. */
+  .pipe__token {
+    top: var(--pos, 0%);
+    left: -7px;
+    margin-left: 0;
+    margin-top: -6px;
+    transition: top 620ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}

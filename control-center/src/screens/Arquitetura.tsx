@@ -11,6 +11,7 @@
 
 import "./Arquitetura.css";
 import { Panel } from "../components/Panel";
+import { Pipeline } from "../components/Pipeline";
 
 const BORDA = "var(--borda-forte)";
 const CAIXA = "var(--superficie-alta)";
@@ -181,6 +182,13 @@ export function Arquitetura() {
           reais — sinteticos, gerados pelo proprio servidor.
         </p>
       </div>
+
+      <Panel
+        titulo="Veja acontecer"
+        descricao="Uma observacao atravessando a plataforma, passo a passo. A trilha se preenche enquanto dois processos diferentes a escrevem."
+      >
+        <Pipeline />
+      </Panel>
 
       <Panel
         titulo="Mecanismos"
