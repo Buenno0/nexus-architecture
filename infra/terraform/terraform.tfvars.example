@@ -14,6 +14,7 @@ budget_notification_email = "voce@exemplo.com"
 cors_allowed_origins = [
   "https://nexus.mateus-bueno.dev",
   "https://nexus-architecture-buenno.vercel.app",
+  "https://nexus-architecture-one.vercel.app",
 ]
 
 # PROVISIONED com 25 WCU/RCU fica na franquia gratuita (custo zero), mas estrangula

@@ -85,6 +85,23 @@ O intervalo de 30s nao e detalhe. No desenvolvimento ele e 3s, e uma unica aba v
 esquecida aberta geraria na ordem de 140.000 requisicoes por dia — mais que todos os
 visitantes somados.
 
+## 4b. Os enderecos da Vercel sao mais de um
+
+A Vercel atribui **varios** apelidos ao mesmo projeto — neste caso
+`nexus-architecture-buenno.vercel.app` e `nexus-architecture-one.vercel.app`, os dois
+servindo a mesma aplicacao. **Settings -> Domains** mostra qual ela considera o de
+producao, e nao e necessariamente o que voce usou primeiro.
+
+Isso importa porque CORS compara a origem **exata**. Um apelido que serve o painel mas
+nao esta na lista produz um painel que carrega e falha em todas as chamadas — e no
+console o erro aponta para CORS, nao para "endereco faltando na lista".
+
+```bash
+AWS_PROFILE=... aws apigatewayv2 get-api --api-id <id> --region us-east-1 --query 'CorsConfiguration.AllowOrigins'
+```
+
+Confira contra a lista de Domains da Vercel sempre que adicionar ou trocar um endereco.
+
 ## 5. Dominio proprio (opcional)
 
 **Nao exige Route 53.** Uma versao anterior deste documento dava a hosted zone
