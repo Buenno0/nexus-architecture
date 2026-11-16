@@ -38,7 +38,7 @@ from nexus.queue.client import (
 )
 from nexus.shared.clock import utcnow
 from nexus.shared.config import Settings, get_settings
-from nexus.shared.errors import QueuePublishError
+from nexus.shared.errors import QueuePublishError, QueueReadError
 from nexus.shared.logging import get_logger
 
 if TYPE_CHECKING:
@@ -189,7 +189,7 @@ class SqsQueue(QueueClient):
         logger.warning("sqs_message_failed", extra={"reason": error[:256]})
         return FailOutcome.RETRY
 
-    def dead_letter(self, receipt: str, *, error: str) -> bool:
+    def dead_letter(self, message: ReceivedMessage, *, error: str) -> bool:
         """Move explicitamente para a DLQ, sem gastar tentativas.
 
         O SQS nao oferece essa operacao: e envio para a DLQ seguido de remocao da
@@ -200,18 +200,21 @@ class SqsQueue(QueueClient):
             logger.warning("sqs_dead_letter_without_dlq")
             return False
 
-        received = self.receive(max_messages=1, visibility_timeout_seconds=30)
-        body = received[0].record_id if received else ""
-
         try:
             self._client.send_message(
                 QueueUrl=self._dlq_url,
-                MessageBody=body or "unknown",
+                MessageBody=message.record_id,
                 MessageAttributes={
+                    "record_id": {"StringValue": message.record_id, "DataType": "String"},
+                    "event_id": {"StringValue": message.event_id or "-", "DataType": "String"},
+                    "correlation_id": {
+                        "StringValue": message.correlation_id or "-",
+                        "DataType": "String",
+                    },
                     "error": {"StringValue": error[:MAX_ERROR_LENGTH], "DataType": "String"},
                 },
             )
-            self._client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=receipt)
+            self._client.delete_message(QueueUrl=self._queue_url, ReceiptHandle=message.receipt)
         except (ClientError, BotoCoreError) as exc:
             logger.error("sqs_dead_letter_failed", extra={"reason": str(exc)})
             return False
@@ -244,8 +247,11 @@ class SqsQueue(QueueClient):
             )
         except (ClientError, BotoCoreError) as exc:
             logger.warning("sqs_attributes_failed", extra={"reason": str(exc)})
-            return 0
-        return int(response.get("Attributes", {}).get(attribute) or 0)
+            raise QueueReadError("Nao foi possivel consultar a fila") from exc
+        value = response.get("Attributes", {}).get(attribute)
+        if value is None:
+            raise QueueReadError("A fila nao retornou a contagem solicitada")
+        return int(value)
 
     def redrive(self, *, limit: int) -> int:
         """Devolve mensagens da DLQ para a fila principal e conta quantas moveu.

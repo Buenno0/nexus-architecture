@@ -126,7 +126,17 @@ class Worker:
             # Retentar nao resolve: o registro nao vai aparecer. Vai direto para a DLQ
             # em vez de consumir o orcamento de tentativas.
             logger.error("worker_record_missing", extra={"record_id": message.record_id})
-            self._queue.dead_letter(message.receipt, error="registro inexistente")
+            if not self._queue.dead_letter(message, error="registro inexistente"):
+                logger.warning("worker_dead_letter_failed", extra={"record_id": message.record_id})
+                registry.increment("worker_failed_total")
+                self._trail.marcar(
+                    message.record_id,
+                    TrailStage.FAILED,
+                    correlation_id=message.correlation_id,
+                    reason="falha ao enviar para DLQ; aguardando expiracao da visibilidade",
+                    attempt=message.receive_count,
+                )
+                return "retried"
             registry.increment("worker_dead_lettered_total")
             self._trail.marcar(
                 message.record_id,

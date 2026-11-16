@@ -24,7 +24,7 @@ function tocar(nome: RegExp) {
 describe("percurso de uma requisicao", () => {
   it("comeca parado, convidando a acao", () => {
     render(<Pipeline />);
-    expect(screen.getByText(/Aperte um dos botoes acima/)).toBeInTheDocument();
+    expect(screen.getByText(/nao representa uma requisicao real/)).toBeInTheDocument();
   });
 
   it("tem alternativa textual carregando a mesma afirmacao da figura", () => {
@@ -36,7 +36,7 @@ describe("percurso de uma requisicao", () => {
 
   it("a requisicao sai do cliente e chega ao vinculo", () => {
     render(<Pipeline />);
-    tocar(/Enviar uma requisicao/);
+    tocar(/enviar uma requisicao/i);
 
     expect(screen.getByText(/A requisicao sai do cliente/)).toBeInTheDocument();
     avancar(8);
@@ -54,7 +54,7 @@ describe("percurso de uma requisicao", () => {
 
   it("os botoes ficam travados enquanto o percurso corre", () => {
     render(<Pipeline />);
-    tocar(/Enviar uma requisicao/);
+    tocar(/enviar uma requisicao/i);
 
     expect(screen.getByRole("button", { name: /em curso/ })).toBeDisabled();
   });

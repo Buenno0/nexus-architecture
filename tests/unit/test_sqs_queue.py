@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterator
+from unittest.mock import patch
 
 import boto3
 import pytest
@@ -17,6 +18,7 @@ from moto import mock_aws
 from nexus.queue.client import FailOutcome, QueueMessage
 from nexus.queue.sqs import SqsQueue
 from nexus.shared.config import Settings
+from nexus.shared.errors import QueueReadError
 
 REGION = "us-east-1"
 MAX_RECEIVE = 3
@@ -73,6 +75,19 @@ class TestConstrucao:
 
     def test_habilitada(self, queue: SqsQueue) -> None:
         assert queue.is_enabled is True
+
+    def test_contagem_indisponivel_nao_vira_zero(self, queue: SqsQueue) -> None:
+        from botocore.exceptions import EndpointConnectionError
+
+        with (
+            patch.object(
+                queue._client,
+                "get_queue_attributes",
+                side_effect=EndpointConnectionError(endpoint_url="https://sqs.invalid"),
+            ),
+            pytest.raises(QueueReadError),
+        ):
+            queue.stats()
 
 
 class TestPublicacaoERecebimento:
@@ -171,14 +186,35 @@ class TestFalhaEDlq:
         queue.publish(msg())
         recebida = queue.receive(max_messages=1)[0]
 
-        assert queue.dead_letter(recebida.receipt, error="registro inexistente") is True
+        assert queue.dead_letter(recebida, error="registro inexistente") is True
         assert queue.stats().dead == 1
+
+    def test_dlq_preserva_mensagem_recebida_sem_consumir_a_proxima(
+        self, queue: SqsQueue, sqs_urls: tuple[str, str]
+    ) -> None:
+        queue.publish(msg(1))
+        queue.publish(msg(2))
+        original = queue.receive(max_messages=1)[0]
+
+        assert queue.dead_letter(original, error="registro inexistente") is True
+        restante = queue.receive(max_messages=1)
+        assert len(restante) == 1
+        assert restante[0].record_id != original.record_id
+
+        client = boto3.client("sqs", region_name=REGION)
+        dlq = client.receive_message(QueueUrl=sqs_urls[1], MessageAttributeNames=["All"])
+        enviada = dlq["Messages"][0]
+        assert enviada["Body"] == original.record_id
+        assert enviada["MessageAttributes"]["event_id"]["StringValue"] == original.event_id
+        assert (
+            enviada["MessageAttributes"]["correlation_id"]["StringValue"] == original.correlation_id
+        )
 
     def test_dead_letter_sem_dlq_configurada(self, settings: Settings) -> None:
         sem_dlq = SqsQueue(settings=settings.model_copy(update={"sqs_dlq_url": None}))
         sem_dlq.publish(msg())
         recebida = sem_dlq.receive(max_messages=1)[0]
-        assert sem_dlq.dead_letter(recebida.receipt, error="x") is False
+        assert sem_dlq.dead_letter(recebida, error="x") is False
 
 
 class TestEstatisticas:

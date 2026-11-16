@@ -78,6 +78,13 @@ class QueuePublishError(NexusError):
     code = "queue_unavailable"
 
 
+class QueueReadError(NexusError):
+    """A profundidade da fila nao pode ser consultada."""
+
+    status_code = 503
+    code = "queue_unavailable"
+
+
 class DemoDisabledError(NexusError):
     """Rota de demonstracao chamada fora do modo demo.
 

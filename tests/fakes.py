@@ -443,7 +443,7 @@ class RecordingQueueClient(QueueClient):
     def fail(self, receipt: str, *, error: str) -> FailOutcome:
         return FailOutcome.UNKNOWN_RECEIPT
 
-    def dead_letter(self, receipt: str, *, error: str) -> bool:
+    def dead_letter(self, message: ReceivedMessage, *, error: str) -> bool:
         return False
 
     def stats(self) -> QueueStats:

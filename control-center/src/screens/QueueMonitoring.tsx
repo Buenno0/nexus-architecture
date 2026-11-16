@@ -91,7 +91,7 @@ export function QueueMonitoring() {
     <>
       <Panel
         titulo="Profundidade"
-        descricao="Vem do armazenamento da fila, nao de contador em memoria."
+        descricao={queue.data?.backend === "sqs" ? "Contagens aproximadas do SQS; outbox vem do armazenamento." : "Vem do armazenamento da fila, nao de contador em memoria."}
       >
         <Grade>
           <StatTile rotulo="aguardando" valor={queue.data?.pending ?? null} origem="persistido" />
@@ -115,30 +115,33 @@ export function QueueMonitoring() {
 
       <Panel
         titulo="Operacoes"
-        descricao="Nada processa sozinho: toda execucao e sob demanda. Operacoes de efeito amplo pedem confirmacao."
+        descricao={config.demoMode ? "Operacoes disponiveis apenas no ambiente de operador. A rede de seguranca pode processar mensagens na demonstracao." : "Execucao sob demanda. Operacoes de efeito amplo pedem confirmacao."}
         acoes={
           <>
             <OpButton
               rotulo="Despachar outbox"
               dica="Publica na fila os eventos pendentes do outbox."
+              desabilitado={config.demoMode}
               onExecutar={async () => guardar(await dispatch.mutateAsync(1000))}
             />
             <OpButton
               rotulo="Processar fila"
               dica="Consome um lote e termina."
+              desabilitado={config.demoMode}
               onExecutar={async () => guardar(await process.mutateAsync(100))}
             />
             <OpButton
               rotulo="Devolver da DLQ"
               variante="perigo"
               confirmacao="Devolver mensagens da DLQ para a fila?"
-              desabilitado={(queue.data?.dead ?? 0) === 0}
+              desabilitado={config.demoMode || (queue.data?.dead ?? 0) === 0}
               onExecutar={async () => guardar(await redrive.mutateAsync(1000))}
             />
             <OpButton
               rotulo="Reprocessar acervo"
               variante="perigo"
               confirmacao="Reenfileirar registros sem resultado na versao corrente?"
+              desabilitado={config.demoMode}
               onExecutar={async () => guardar(await reprocess.mutateAsync(1000))}
             />
           </>
@@ -150,7 +153,7 @@ export function QueueMonitoring() {
       <Panel
         titulo="Gerar registros sinteticos"
         descricao="Dados ficticios, com 15% de duplicatas exatas e 25% de variantes da mesma entidade. Nenhum dado pessoal real."
-        acoes={VOLUMES.map((n) => (
+        acoes={(config.demoMode ? [100] : VOLUMES).map((n) => (
           <OpButton
             key={n}
             rotulo={`Gerar ${n.toLocaleString("pt-BR")}`}

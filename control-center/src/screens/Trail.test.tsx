@@ -57,6 +57,23 @@ describe("Trail", () => {
     expect(await screen.findByText("api, worker")).toBeInTheDocument();
   });
 
+  it("mostra correlation_id de cada marco e avisa que marcos podem faltar", async () => {
+    mockarApi(API);
+    renderizar(<Trail />);
+    await consultar("01TESTE");
+    expect(await screen.findAllByText(/correlation_id: corr-1/)).toHaveLength(4);
+    expect(screen.getByText(/podem faltar eventos/)).toBeInTheDocument();
+    expect(screen.getByText("entre primeiro e ultimo marco")).toBeInTheDocument();
+  });
+
+  it("aponta marcos nao observados sem concluir que houve falha", async () => {
+    mockarApi({ ...API, "/v1/observability/trail/01TESTE": { ...trilhaFalsa, events: [trilhaFalsa.events[0]], total_ms: null, services: ["api"] } });
+    renderizar(<Trail />);
+    await consultar("01TESTE");
+    expect(await screen.findByText(/Marcos do caminho comum nao encontrados/)).toHaveTextContent("published, consumed, resolved");
+    expect(screen.getByText(/processamento ainda pode estar em curso/)).toBeInTheDocument();
+  });
+
   it("mostra o delta que localiza o gargalo", async () => {
     mockarApi(API);
     renderizar(<Trail />);

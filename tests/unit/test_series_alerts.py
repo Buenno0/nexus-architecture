@@ -154,6 +154,16 @@ class TestAmostragem:
 
 
 class TestAlertas:
+    def test_fila_indisponivel_nao_parece_saudavel(
+        self, repo: FakeRepository, obs_settings: Settings
+    ) -> None:
+        class FilaIndisponivel(RecordingQueueClient):
+            def stats(self):  # type: ignore[no-untyped-def]
+                raise RuntimeError("fila indisponivel")
+
+        ativos = AlertEvaluator(repo, FilaIndisponivel(enabled=True), obs_settings).evaluate()
+        assert [a.id for a in ativos] == ["queue_unavailable"]
+
     def test_plataforma_saudavel_nao_acende_nada(
         self, repo: FakeRepository, obs_settings: Settings
     ) -> None:

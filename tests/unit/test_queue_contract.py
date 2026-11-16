@@ -194,7 +194,7 @@ class TestDeadLetterExplicito:
         queue.publish(msg())
         recebida = queue.receive(max_messages=1)[0]
 
-        assert queue.dead_letter(recebida.receipt, error="irrecuperavel") is True
+        assert queue.dead_letter(recebida, error="irrecuperavel") is True
         assert queue.stats().dead == 1
 
 

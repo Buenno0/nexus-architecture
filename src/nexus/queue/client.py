@@ -122,7 +122,7 @@ class QueueClient(ABC):
         """
 
     @abstractmethod
-    def dead_letter(self, receipt: str, *, error: str) -> bool:
+    def dead_letter(self, message: ReceivedMessage, *, error: str) -> bool:
         """Move a mensagem direto para a DLQ, sem gastar tentativas.
 
         Para falhas que retentativa nao resolve — registro inexistente, mensagem
@@ -163,7 +163,7 @@ class NullQueueClient(QueueClient):
     def fail(self, receipt: str, *, error: str) -> FailOutcome:
         return FailOutcome.UNKNOWN_RECEIPT
 
-    def dead_letter(self, receipt: str, *, error: str) -> bool:
+    def dead_letter(self, message: ReceivedMessage, *, error: str) -> bool:
         return False
 
     def stats(self) -> QueueStats:

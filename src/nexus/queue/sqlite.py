@@ -321,14 +321,14 @@ class SqliteQueue(QueueClient):
         )
         return outcome
 
-    def dead_letter(self, receipt: str, *, error: str) -> bool:
+    def dead_letter(self, message: ReceivedMessage, *, error: str) -> bool:
         """Move direto para a DLQ, ignorando o orcamento de tentativas."""
         now = utcnow()
         truncated = error[:MAX_ERROR_LENGTH]
 
         with self._write_transaction() as conn:
             row = conn.execute(
-                "SELECT message_id FROM messages WHERE receipt = ?", (receipt,)
+                "SELECT message_id FROM messages WHERE receipt = ?", (message.receipt,)
             ).fetchone()
             if row is None:
                 return False

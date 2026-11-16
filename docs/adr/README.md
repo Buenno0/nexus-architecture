@@ -20,6 +20,7 @@ documento, com data — apagar o raciocinio original apagaria a razao de ter mud
 | [008](ADR-008-arquitetura-serverless.md) | Arquitetura serverless na AWS | Aceita — **implantada e destruida** | 3 |
 | [009](ADR-009-control-center.md) | Todo numero declara de onde veio | Aceita — **parcialmente superada pelo 010** | 4 |
 | [010](ADR-010-observabilidade.md) | Trilha durável, best-effort, por registro | Aceita | 6 |
+| [011](ADR-011-demonstracao-somente-leitura.md) | Limitar mutacoes na demonstracao publica | Aceita no codigo; implantacao pendente | Evolucao |
 
 Nenhum ADR foi **revogado**. Tres tiveram o alcance alterado, e cada um diz isso no
 proprio cabecalho.

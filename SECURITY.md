@@ -57,18 +57,17 @@ authorizer JWT que protege o resto, exceto `/health`.
 
 Mitigacoes atuais:
 
-- A API escuta apenas em `localhost` via Docker; nada publicamente acessivel.
+- No ambiente local, a API escuta em `localhost` via Docker. A demonstracao AWS e publica.
 - Todo lote tem teto rigido validado na borda (`limit`, `max_messages`).
 - Nenhuma rota apaga dados: `redrive` devolve mensagens, nao as descarta.
 
-**Resolvido na Fase 3, ainda nao implantado.** O Terraform protege todas as rotas com
-authorizer JWT do Cognito, exceto `/health`. Um segredo compartilhado nao serviria: uma
-SPA nao guarda segredo, e qualquer chave no JavaScript esta publica.
+Na AWS, o gateway protege as rotas expostas com authorizer JWT do Cognito, exceto
+`/health`. A credencial de visitante e publica; o JWT nao distingue visitante de
+operador, portanto as restricoes de escrita da demonstracao sao essenciais.
 
-Enquanto o deploy nao acontece, as rotas continuam abertas **no ambiente local**, que
-escuta apenas em `localhost`.
+No ambiente local, as rotas continuam abertas e a API escuta apenas em `localhost`.
 
-## Postura na AWS (construida, nao implantada)
+## Postura na AWS
 
 | Controle | Implementacao |
 |---|---|
@@ -86,7 +85,7 @@ escuta apenas em `localhost`.
 > omissao produz um `AccessDenied` que so aparece na primeira consulta — motivo pelo
 > qual `${tabela}/index/*` esta explicito nas policies.
 
-**O primeiro deploy usara AdministratorAccess, que e mais do que o necessario.** O
+**O deploy usou AdministratorAccess, que e mais do que o necessario.** O
 runbook registra isso como divida: o correto e uma role dedicada, limitada aos
 servicos do `iam.tf`.
 
@@ -129,6 +128,11 @@ culpada, mas reverte-la e manual.
 - Operacoes caras no Control Center exigem confirmacao e possuem teto rigido.
 
 ## Demonstracao publica (Fase 9)
+
+**Atualizacao de 15/11/2026:** o ADR-011 foi implantado: as rotas operacionais de
+escrita e decisao de revisao foram removidas do gateway da demonstracao e a API tambem
+recusa essas operacoes. As observacoes historicas da Fase 9 abaixo nao comprovam o
+estado atual da infraestrutura.
 
 Expor a plataforma na internet muda a analise, e vale escrever o que muda antes de
 aplicar qualquer coisa.

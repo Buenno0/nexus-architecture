@@ -60,10 +60,8 @@ locals {
     # responde o preflight com 204, que e como `GET /v1/records` sempre funcionou.
     #
     # Encontrado em 12/11/2026, na primeira vez que o painel falou com o gateway.
-    ops_read  = "GET /v1/ops/{proxy+}"
-    ops_write = "POST /v1/ops/{proxy+}"
-    res_read  = "GET /v1/resolution/{proxy+}"
-    res_write = "POST /v1/resolution/{proxy+}"
+    ops_read = "GET /v1/ops/{proxy+}"
+    res_read = "GET /v1/resolution/{proxy+}"
 
     # Fase 6, ausente ate 12/11/2026. O mapa foi escrito na Fase 3; a Fase 6 criou as
     # rotas na aplicacao com a infraestrutura ja destruida, entao o gateway nunca foi
@@ -89,9 +87,15 @@ locals {
     demo_seed = "POST /v1/demo/seed"
   }
 
+  operator_routes = {
+    ops_write = "POST /v1/ops/{proxy+}"
+    res_write = "POST /v1/resolution/{proxy+}"
+  }
+
   protected_routes = merge(
     local.base_routes,
     var.demo_mode ? local.demo_routes : local.ingest_routes,
+    var.demo_mode ? {} : local.operator_routes,
   )
 }
 

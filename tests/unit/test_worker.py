@@ -268,6 +268,23 @@ class TestFalhas:
         assert queue.stats().dead == 1
         assert queue.stats().pending == 0
 
+    def test_falha_de_envio_para_dlq_nao_registra_sucesso(
+        self,
+        repo: FakeRepository,
+        queue: SqliteQueue,
+        settings: Settings,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        queue.publish(QueueMessage("evt-orfao", "rec-inexistente", "corr"))
+        monkeypatch.setattr(queue, "dead_letter", lambda _message, **_kwargs: False)
+
+        relatorio = Worker(repo, queue, DefaultProcessor(), settings).process_once()
+
+        assert relatorio.dead_lettered == 0
+        assert relatorio.retried == 1
+        assert queue.stats().dead == 0
+        assert queue.stats().in_flight == 1
+
     def test_mensagem_envenenada_nao_trava_as_demais(
         self, repo: FakeRepository, queue: SqliteQueue, settings: Settings
     ) -> None:

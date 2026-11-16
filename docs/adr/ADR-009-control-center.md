@@ -1,5 +1,12 @@
 # ADR-009 — Todo numero declara de onde veio
 
+> **Atualizacao (2026-11-15):** `/metrics` inclui um identificador aleatorio da
+> instancia que atende a leitura. A taxa HTTP e calculada apenas entre respostas da
+> mesma instancia e usa os instantes de recebimento. Se a instancia mudar, o
+> contador diminuir ou o identificador estiver ausente (API antiga), a taxa fica
+> indisponivel ate existirem duas leituras comparaveis. Isso nao a transforma em
+> vazao agregada de todas as replicas. Historico de sessoes continua local a aba.
+
 - **Status:** Aceita — **parcialmente superada pelo [ADR-010](ADR-010-observabilidade.md)**
 - **Data:** 2026-11-09
 - **Emenda:** o principio de rotular a origem de todo numero continua valendo integralmente.

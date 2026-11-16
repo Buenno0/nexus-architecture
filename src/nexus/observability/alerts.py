@@ -133,7 +133,15 @@ class AlertEvaluator:
             stats = self._queue.stats()
         except Exception as exc:
             logger.warning("alert_queue_stats_failed", extra={"reason": str(exc)})
-            return []
+            return [
+                Alert(
+                    id="queue_unavailable",
+                    severity=Severity.WARNING,
+                    title="Estado da fila indisponivel",
+                    detail="Nao foi possivel consultar a fila ou avaliar a DLQ.",
+                    origin=Origin.PERSISTED,
+                )
+            ]
         if stats.dead == 0:
             return []
         return [

@@ -47,7 +47,8 @@ export function Overview() {
   const aceitos = contadores ? somarPorNome(contadores, "ingestion_accepted_total") : null;
   const duplicados = contadores ? somarPorNome(contadores, "ingestion_duplicate_total") : null;
   const latencia = metrics.data?.latency_ms ?? {};
-  const http = Object.entries(latencia).find(([k]) => k.startsWith("http_request_duration"))?.[1];
+  const rotasHttp = Object.entries(latencia).filter(([k]) => k.startsWith("http_request_duration"));
+  const http = rotasHttp.length === 1 ? rotasHttp[0]?.[1] : undefined;
   const erros4xx5xx = contadores
     ? Object.entries(contadores)
         .filter(([k]) => k.startsWith("http_requests_total") && /status=[45]\d\d/.test(k))
@@ -101,7 +102,7 @@ export function Overview() {
         </Grade>
       </Panel>
 
-      <Panel titulo="Fila e processamento">
+      <Panel titulo="Fila e processamento" descricao={queue.data?.backend === "sqs" ? "Profundidade da fila e DLQ: estimativas do SQS." : undefined}>
         <Grade>
           <StatTile rotulo="aguardando" valor={queue.data?.pending ?? null} origem="persistido" carregando={queue.isLoading} />
           <StatTile rotulo="em voo" valor={queue.data?.in_flight ?? null} origem="persistido" />
@@ -125,17 +126,18 @@ export function Overview() {
         </Grade>
       </Panel>
 
-      <Panel titulo="Latencia HTTP" descricao="Percentis, nao media: a media esconde a cauda.">
+      <Panel titulo="Latencia HTTP" descricao={rotasHttp.length === 1 ? `Uma rota observada: ${rotasHttp[0]?.[0]}. Percentis deste processo.` : "Percentis sao por rota. Consulte Observabilidade ou API para ver cada rota; nao ha percentil global."}>
         <Grade minimo={140}>
           <StatTile rotulo="p50" valor={http?.p50 ?? null} unidade="ms" origem="processo" />
           <StatTile rotulo="p95" valor={http?.p95 ?? null} unidade="ms" origem="processo" />
           <StatTile rotulo="p99" valor={http?.p99 ?? null} unidade="ms" origem="processo" />
           <StatTile rotulo="maximo" valor={http?.max ?? null} unidade="ms" origem="processo" />
           <StatTile
-            rotulo="taxa de erro"
+            rotulo="respostas 4xx e 5xx"
             valor={taxaErro}
             unidade="%"
             origem="processo"
+            dica="Proporcao calculada neste processo. O alerta usa apenas 5xx."
             estado={(taxaErro ?? 0) > 5 ? "erro" : "normal"}
           />
         </Grade>
@@ -166,7 +168,8 @@ export function Overview() {
           <StatTile rotulo="entidades" valor={resolution.data?.counters.entities_created ?? null} origem="persistido" />
           <StatTile
             rotulo="aguardando revisao"
-            valor={resolution.data?.pending_reviews ?? null}
+            valor={resolution.data?.pending_reviews === 100 ? "100 ou mais" : resolution.data?.pending_reviews ?? null}
+            dica="A consulta retorna ate 100 pares; o total pode ser maior."
             origem="persistido"
             estado={(resolution.data?.pending_reviews ?? 0) > 0 ? "atencao" : "normal"}
           />

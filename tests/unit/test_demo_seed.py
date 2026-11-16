@@ -66,6 +66,44 @@ class TestModoDesligado:
         assert repositorio.demo_seeded == 0
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/v1/ops/dispatch",
+        "/v1/ops/process",
+        "/v1/ops/redrive",
+        "/v1/ops/reprocess",
+        "/v1/ops/sample",
+        "/v1/resolution/reviews/par",
+    ],
+)
+def test_demo_nao_autoriza_operacoes(demo: TestClient, path: str) -> None:
+    corpo = {"decision": "reject", "reason": "texto arbitrario"} if "reviews" in path else {}
+    assert demo.post(path, json=corpo).status_code == 404
+
+
+def test_nova_rota_de_escrita_fica_fechada_por_padrao(repositorio: FakeRepository) -> None:
+    chamadas: list[bool] = []
+
+    def nova_operacao() -> dict[str, bool]:
+        chamadas.append(True)
+        return {"ok": True}
+
+    app.add_api_route("/v1/teste-operacao-futura", nova_operacao, methods=["POST"])
+    try:
+        cliente_demo = montar(repositorio, demo_mode=True)
+        assert cliente_demo.post("/v1/teste-operacao-futura").status_code == 404
+        assert not chamadas
+        cliente_operador = montar(repositorio, demo_mode=False)
+        assert cliente_operador.post("/v1/teste-operacao-futura").status_code == 200
+        assert chamadas == [True]
+    finally:
+        app.router.routes[:] = [
+            rota for rota in app.router.routes if rota.path != "/v1/teste-operacao-futura"
+        ]
+        app.dependency_overrides.clear()
+
+
 class TestSemeadura:
     def test_gera_e_persiste(self, demo: TestClient, repositorio: FakeRepository) -> None:
         corpo = demo.post("/v1/demo/seed", json={"count": 10}).json()

@@ -146,6 +146,15 @@ ServiceDep = Annotated[IngestionService, Depends(get_service)]
 IdempotencyKeyDep = Annotated[str, Depends(require_idempotency_key)]
 
 
+def _demo_write_guard(request: Request, settings: SettingsDep) -> None:
+    """Novas rotas de escrita tambem devem nascer fechadas na demo publica."""
+    if not settings.demo_mode or request.method in {"GET", "HEAD", "OPTIONS"}:
+        return
+    if request.method == "POST" and request.url.path == "/v1/demo/seed":
+        return
+    raise DemoDisabledError("Operacao indisponivel na demonstracao publica")
+
+
 # ---------------------------------------------------------------------- ciclo de vida
 
 
@@ -169,6 +178,7 @@ app = FastAPI(
     ),
     version=__version__,
     lifespan=lifespan,
+    dependencies=[Depends(_demo_write_guard)],
 )
 app.add_middleware(ObservabilityMiddleware)
 
@@ -265,6 +275,12 @@ def _response(result: IngestionResult) -> JSONResponse:
 
 
 # ------------------------------------------------------------------------------ rotas
+
+
+def _operator_only(settings: SettingsDep) -> None:
+    """A credencial publica da demo nao autoriza mutacoes operacionais."""
+    if settings.demo_mode:
+        raise DemoDisabledError("Operacao indisponivel na demonstracao publica")
 
 
 @app.post(
@@ -454,6 +470,7 @@ async def metrics(
 
     return {
         "scope": "in_process",
+        "instance_id": snapshot["instance_id"],
         "environment": settings.env,
         "series_sampled": sample_written,
         "outbox_pending": backlog,
@@ -496,6 +513,7 @@ async def metrics(
 
 @app.post(
     "/v1/ops/dispatch",
+    dependencies=[Depends(_operator_only)],
     response_model=DispatchOut,
     summary="Publica eventos pendentes do outbox na fila",
     tags=["ops"],
@@ -520,6 +538,7 @@ async def ops_dispatch(
 
 @app.post(
     "/v1/ops/process",
+    dependencies=[Depends(_operator_only)],
     response_model=ProcessOut,
     summary="Consome um lote da fila",
     tags=["ops"],
@@ -566,6 +585,7 @@ async def ops_queue(
 
 @app.post(
     "/v1/ops/redrive",
+    dependencies=[Depends(_operator_only)],
     response_model=RedriveOut,
     summary="Devolve mensagens da DLQ para a fila",
     tags=["ops"],
@@ -670,6 +690,7 @@ async def list_reviews(
 
 @app.post(
     "/v1/resolution/reviews/{pair_id}",
+    dependencies=[Depends(_operator_only)],
     response_model=ReviewOut,
     summary="Decide um par em duvida",
     responses={404: {"model": ErrorOut, "description": "Par inexistente"}},
@@ -732,6 +753,7 @@ async def resolution_stats(repository: RepositoryDep, settings: SettingsDep) -> 
 
 @app.post(
     "/v1/ops/reprocess",
+    dependencies=[Depends(_operator_only)],
     response_model=ReprocessOut,
     summary="Reenfileira observacoes sem resultado na versao corrente",
     tags=["ops"],
@@ -908,6 +930,7 @@ async def observability_alerts(
 
 @app.post(
     "/v1/ops/sample",
+    dependencies=[Depends(_operator_only)],
     response_model=SampleOut,
     summary="Forca uma amostra da janela deslizante",
     tags=["ops"],

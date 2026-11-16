@@ -152,6 +152,12 @@ make fail-test RATE=0.5
 
 ## Control Center (Fase 4)
 
+As telas de Experimentos e Decisoes usam um retrato gerado dos JSONs de
+`docs/performance/runs/` e dos ADRs. Apos alterar essas fontes, rode
+`python scripts/export_lab_data.py` e versione `control-center/src/generated/lab-data.json`.
+O CI confere se o arquivo gerado corresponde as fontes. A copia representa o estado do
+repositorio no build; o link em cada tela abre a fonte original.
+
 ```bash
 make up && make dashboard
 ```

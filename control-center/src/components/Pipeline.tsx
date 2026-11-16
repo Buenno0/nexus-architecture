@@ -40,7 +40,7 @@ const NOS: No[] = [
   { id: "cliente", x: 10, y: 36, nome: "cliente", papel: "FONTE", externo: true },
   { id: "api", x: 250, y: 36, nome: "API", papel: "INGESTAO" },
   { id: "dynamo", x: 640, y: 36, nome: "DynamoDB", papel: "ARMAZENAMENTO" },
-  { id: "fila", x: 250, y: 180, nome: "fila", papel: "SQS" },
+  { id: "fila", x: 250, y: 180, nome: "fila", papel: "SQLITE / SQS" },
   { id: "worker", x: 450, y: 180, nome: "worker", papel: "CONSUMO" },
   { id: "resolucao", x: 640, y: 180, nome: "resolucao", papel: "IDENTIDADE" },
   { id: "dlq", x: 450, y: 320, nome: "DLQ", papel: "FALHA", falha: true },
@@ -249,7 +249,7 @@ export function Pipeline() {
     <div className={`flux ${comFalha ? "flux--com-falha" : ""}`}>
       <div className="flux__controles">
         <button type="button" className="op op--normal" onClick={() => tocar(FELIZ)} disabled={rodando}>
-          {rodando && !comFalha ? "em curso…" : "▶ Enviar uma requisicao"}
+          {rodando && !comFalha ? "em curso…" : "▶ Simular: enviar uma requisicao"}
         </button>
         <button type="button" className="op op--perigo" onClick={() => tocar(COM_FALHA)} disabled={rodando}>
           {rodando && comFalha ? "em curso…" : "▶ Com falha no processamento"}
@@ -341,7 +341,7 @@ export function Pipeline() {
               {legenda.texto}
             </>
           ) : (
-            "Aperte um dos botoes acima e acompanhe a requisicao. O caminho e assincrono de ponta a ponta, e nenhuma falha perde o registro."
+            "Aperte um dos botoes para simular o percurso. O desenho ilustra mecanismos e nao representa uma requisicao real."
           )}
         </figcaption>
       </figure>

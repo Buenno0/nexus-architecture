@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import "./App.css";
 import { config } from "./api/config";
@@ -11,25 +11,41 @@ import { Overview } from "./screens/Overview";
 import { QueueMonitoring } from "./screens/QueueMonitoring";
 import { Trail } from "./screens/Trail";
 import { WorkerMonitoring } from "./screens/WorkerMonitoring";
+import { ObservabilityCenter } from "./screens/ObservabilityCenter";
+import { Decisoes, Experimentos, Infraestrutura } from "./screens/EngineeringLab";
 import { AlertBanner } from "./components/AlertBanner";
 import { useAlerts, useHealth } from "./api/queries";
 
 const TELAS = [
   { id: "arquitetura", rotulo: "Arquitetura", componente: Arquitetura },
   { id: "overview", rotulo: "Overview", componente: Overview },
+  { id: "observabilidade", rotulo: "Observabilidade", componente: ObservabilityCenter },
   { id: "api", rotulo: "API", componente: ApiMonitoring },
   { id: "queue", rotulo: "Queue", componente: QueueMonitoring },
   { id: "worker", rotulo: "Worker", componente: WorkerMonitoring },
   { id: "resolution", rotulo: "Entity Resolution", componente: EntityResolution },
   { id: "trail", rotulo: "Trail", componente: Trail },
+  { id: "experimentos", rotulo: "Experimentos", componente: Experimentos },
+  { id: "decisoes", rotulo: "Decisões", componente: Decisoes },
+  { id: "infraestrutura", rotulo: "Infraestrutura", componente: Infraestrutura },
 ] as const;
 
 type TelaId = (typeof TELAS)[number]["id"];
 
+function telaDaUrl(): TelaId | null {
+  const id = window.location.hash.slice(1);
+  return TELAS.find((t) => t.id === id)?.id ?? null;
+}
+
 export function App() {
   // Em modo demonstracao a primeira tela explica o sistema; no uso local, quem abre e
   // o operador, que quer os numeros. O publico de cada ambiente e outro.
-  const [tela, setTela] = useState<TelaId>(config.demoMode ? "arquitetura" : "overview");
+  const [tela, setTela] = useState<TelaId>(() => telaDaUrl() ?? (config.demoMode ? "arquitetura" : "overview"));
+  useEffect(() => {
+    const atualizar = () => { const destino = telaDaUrl(); if (destino) setTela(destino); };
+    window.addEventListener("hashchange", atualizar);
+    return () => window.removeEventListener("hashchange", atualizar);
+  }, []);
   const { autenticado, modo, usuario, sair } = useAuth();
   const health = useHealth(autenticado);
   // Depois da autenticacao: ver a docstring de useAlerts.
@@ -52,13 +68,14 @@ export function App() {
           <span className="topo__sub">Control Center</span>
         </div>
 
-        <nav className="topo__nav">
+        <nav className="topo__nav" aria-label="Áreas do Nexus">
           {TELAS.map((t) => (
             <button
               key={t.id}
               type="button"
               className={`aba ${t.id === tela ? "aba--ativa" : ""}`}
-              onClick={() => setTela(t.id)}
+              aria-current={t.id === tela ? "page" : undefined}
+              onClick={() => { setTela(t.id); window.location.hash = t.id; }}
             >
               {t.rotulo}
             </button>
@@ -85,7 +102,7 @@ export function App() {
       <main className="conteudo">
         {/* A faixa fica fora da tela ativa: um alerta de DLQ importa tanto na tela de
             resolucao quanto na da fila, e so apareceria numa delas se vivesse dentro. */}
-        <AlertBanner alertas={alertas.data?.alerts} erro={alertas.isError} />
+        {tela !== "observabilidade" && <AlertBanner alertas={alertas.data?.alerts} erro={alertas.isError} />}
         <Componente />
       </main>
 

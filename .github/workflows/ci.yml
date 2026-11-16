@@ -67,6 +67,9 @@ jobs:
       - name: mypy strict
         run: uv run mypy
 
+      - name: Verificar dados do laboratorio
+        run: uv run python scripts/export_lab_data.py --check
+
   testes-python:
     name: Testes Python
     runs-on: ubuntu-latest

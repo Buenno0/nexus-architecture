@@ -105,6 +105,15 @@ button {
   font-size: 12px;
 }
 
+@media (max-width: 720px) {
+  .tabela {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
 .tabela th {
   text-align: left;
   color: var(--texto-fraco);

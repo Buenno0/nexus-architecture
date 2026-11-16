@@ -12,6 +12,7 @@
 import "./Arquitetura.css";
 import { Panel } from "../components/Panel";
 import { Pipeline } from "../components/Pipeline";
+import { ArchitectureExplorer } from "../components/ArchitectureExplorer";
 
 const BORDA = "var(--borda-forte)";
 const CAIXA = "var(--superficie-alta)";
@@ -182,6 +183,8 @@ export function Arquitetura() {
           reais — sinteticos, gerados pelo proprio servidor.
         </p>
       </div>
+
+      <ArchitectureExplorer />
 
       <Panel
         titulo="O caminho de uma observacao"

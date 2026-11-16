@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { config } from "../api/config";
 
 import { ErrorState } from "../components/ErrorState";
 import { Loading } from "../components/Loading";
@@ -72,6 +73,7 @@ function CartaoDeRevisao({ item }: { item: ReviewItem }) {
         <div className="revisao__acoes">
           <OpButton
             rotulo="Confirmar fusao"
+            desabilitado={config.demoMode}
             confirmacao="Sao a mesma entidade?"
             onExecutar={() =>
               decidir.mutateAsync({
@@ -83,6 +85,7 @@ function CartaoDeRevisao({ item }: { item: ReviewItem }) {
           />
           <OpButton
             rotulo="Recusar"
+            desabilitado={config.demoMode}
             variante="perigo"
             onExecutar={() =>
               decidir.mutateAsync({
@@ -104,6 +107,7 @@ function CartaoDeRevisao({ item }: { item: ReviewItem }) {
       <input
         className="revisao__campo"
         placeholder="Motivo da decisao (opcional, fica registrado)"
+        disabled={config.demoMode}
         value={motivo}
         onChange={(e) => setMotivo(e.target.value)}
       />
@@ -150,7 +154,8 @@ export function EntityResolution() {
           />
           <StatTile
             rotulo="aguardando revisao"
-            valor={stats.data?.pending_reviews ?? null}
+            valor={stats.data?.pending_reviews === 100 ? "100 ou mais" : stats.data?.pending_reviews ?? null}
+            dica="A consulta retorna ate 100 pares; o total pode ser maior."
             origem="persistido"
             estado={(stats.data?.pending_reviews ?? 0) > 0 ? "atencao" : "normal"}
           />
@@ -159,7 +164,7 @@ export function EntityResolution() {
 
       <Panel
         titulo="Fila de revisao"
-        descricao="Pares em duvida. Confirmar funde os clusters; recusar registra a decisao e impede que o par volte em reprocessamentos."
+        descricao={config.demoMode ? "Pares em duvida. Decisoes estao desabilitadas na demonstracao publica." : "Pares em duvida. Confirmar funde os clusters; recusar registra a decisao e impede que o par volte em reprocessamentos."}
       >
         {reviews.isError ? (
           <ErrorState erro={reviews.error} />

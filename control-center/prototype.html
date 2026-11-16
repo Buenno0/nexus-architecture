@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0a1230" />
+    <meta name="description" content="Nexus Architecture: ingestão, fila, resolução de identidade e observabilidade em uma demonstração com dados sintéticos." />
+    <title>Nexus Architecture — do registro à resolução</title>
+    <link rel="stylesheet" href="/prototype.css" />
+    <script type="module" src="/prototype.js"></script>
+  </head>
+  <body>
+    <div class="page-shell" id="inicio">
+      <header class="site-header">
+        <a class="brand" href="#inicio" aria-label="Nexus, voltar ao início"><span class="brand-mark">N<span></span></span><span>NEXUS <small>ARCHITECTURE</small></span></a>
+        <nav class="site-nav" aria-label="Navegação principal">
+          <a href="#percurso">O percurso</a><a href="#decisoes">Decisões</a><a href="#evidencias">Evidências</a>
+        </nav>
+        <a class="header-action" href="/">Abrir Control Center <span aria-hidden="true">↗</span></a>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-line"></span> NEXUS ARCHITECTURE · PROJETO PESSOAL</div>
+            <h1 id="hero-title">Do registro<br><em>à resolução.</em></h1>
+            <p class="hero-lead">A API recebe o registro. O outbox guarda o evento, a fila entrega ao worker e a resolução decide o que pode ser associado. Os ADRs explicam o motivo e o custo de cada mecanismo.</p>
+            <div class="hero-actions"><a class="button button-primary" href="#percurso">Entender o percurso <span aria-hidden="true">↓</span></a><a class="button button-text" href="/">Abrir a demonstração <span aria-hidden="true">→</span></a></div>
+            <p class="hero-note">Demonstração pública com dados sintéticos.</p>
+          </div>
+          <div class="hero-visual" role="img" aria-label="Esquema simplificado: API grava registro e evento no DynamoDB; o outbox publica na fila; o worker processa e pode enviar falhas para a DLQ. API e worker emitem marcos para a trilha.">
+            <div class="schematic-head"><span>ARQUITETURA / RECORTE SIMPLIFICADO</span><span>01 — CAMINHO PRINCIPAL</span></div>
+            <div class="schematic-row">
+              <div class="schematic-node"><small>01 / RECEBE</small><strong>API</strong><span>valida e aplica idempotência</span></div>
+              <div class="schematic-connector" aria-hidden="true"></div>
+              <div class="schematic-node schematic-node-store"><small>02 / GRAVA</small><strong>DynamoDB</strong><span>registro + evento no outbox</span></div>
+              <div class="schematic-connector" aria-hidden="true"></div>
+              <div class="schematic-node"><small>03 / PUBLICA</small><strong>Fila</strong><span>entrega e retentativa</span></div>
+              <div class="schematic-connector" aria-hidden="true"></div>
+              <div class="schematic-node"><small>04 / PROCESSA</small><strong>Worker</strong><span>resolução de identidade</span></div>
+            </div>
+            <div class="schematic-branches"><div><span class="branch-line"></span><b>FALHA APÓS RETENTATIVAS</b><strong>DLQ</strong><span>mensagem visível para redrive</span></div><div><span class="branch-line"></span><b>API + WORKER</b><strong>Trilha</strong><span>marcos persistidos em best-effort</span></div></div>
+            <div class="schematic-foot">O fluxo acima descreve mecanismos implementados. A trilha pode ter lacunas e não é auditoria.</div>
+          </div>
+        </section>
+
+        <section class="journey section-wrap" id="percurso" aria-labelledby="journey-title">
+          <div class="section-heading"><span class="section-kicker">01 / PERCURSO</span><h2 id="journey-title">O que acontece<br><em>com um registro?</em></h2><p>O desenho resume uma passagem possível pelo sistema. Selecione uma etapa para ver o mecanismo e a decisão documentada.</p></div>
+          <div class="journey-panel">
+            <div class="journey-steps" role="tablist" aria-label="Mecanismos do Nexus">
+              <span class="journey-index-label">MECANISMOS</span>
+              <button class="journey-step active" type="button" role="tab" aria-selected="true" aria-controls="stage-panel" id="stage-tab-0" data-step="0"><span><strong>Receber</strong><small>API · idempotência</small></span></button>
+              <button class="journey-step" type="button" role="tab" aria-selected="false" aria-controls="stage-panel" id="stage-tab-1" data-step="1" tabindex="-1"><span><strong>Gravar</strong><small>DynamoDB · outbox</small></span></button>
+              <button class="journey-step" type="button" role="tab" aria-selected="false" aria-controls="stage-panel" id="stage-tab-2" data-step="2" tabindex="-1"><span><strong>Entregar</strong><small>fila · retentativa · DLQ</small></span></button>
+              <button class="journey-step" type="button" role="tab" aria-selected="false" aria-controls="stage-panel" id="stage-tab-3" data-step="3" tabindex="-1"><span><strong>Resolver</strong><small>score · revisão humana</small></span></button>
+              <button class="journey-step" type="button" role="tab" aria-selected="false" aria-controls="stage-panel" id="stage-tab-4" data-step="4" tabindex="-1"><span><strong>Registrar marcos</strong><small>trilha · API e worker</small></span></button>
+            </div>
+            <article class="stage-content" id="stage-panel" role="tabpanel" aria-labelledby="stage-tab-0" tabindex="0">
+              <div class="stage-topline"><span id="stage-label">ETAPA 01 / 05</span><span>ESQUEMA, NÃO DADOS AO VIVO</span></div>
+              <div class="stage-diagram" aria-hidden="true"><div class="diagram-source"><span>CLIENTE</span><b>POST</b></div><div class="diagram-line"><i></i></div><div class="diagram-target"><span>API</span><b>CHAVE</b></div><div class="diagram-caption" id="diagram-caption">mesma operação → resposta armazenada</div></div>
+              <div class="stage-copy"><span class="stage-category" id="stage-category">ENTRADA / API</span><h3 id="stage-title">Repetir a chamada não duplica o registro.</h3><p id="stage-description">Se a resposta se perder na rede, o cliente pode tentar de novo com a mesma chave de idempotência. A API devolve a resposta armazenada para aquela operação.</p><a id="stage-link" href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/adr/ADR-002-identidade-e-idempotencia.md" target="_blank" rel="noopener noreferrer">Ler o ADR-002 <span aria-hidden="true">↗</span></a></div>
+              <div class="stage-controls"><span>SELECIONE OUTRA ETAPA</span><div><button id="step-prev" type="button" aria-label="Etapa anterior" disabled>←</button><button id="step-next" type="button" aria-label="Próxima etapa">→</button></div></div>
+            </article>
+          </div>
+        </section>
+
+        <section class="decisions section-wrap" id="decisoes" aria-labelledby="decisions-title"><div class="section-heading"><span class="section-kicker">02 / DECISÕES</span><h2 id="decisions-title">O mecanismo<br><em>e o custo.</em></h2><p>As escolhas abaixo resolvem problemas concretos. Os ADRs registram também as alternativas recusadas e o preço de manter cada mecanismo.</p></div><div class="decision-grid"><article class="decision-card"><span class="card-index">ADR-003 / TRANSACTIONAL OUTBOX</span><div class="decision-rule"></div><h3>Registro salvo, evento perdido.</h3><p><b>Problema.</b> Um processo pode cair entre gravar no banco e publicar na fila.</p><p><b>Escolha.</b> Registro e evento pendente são gravados numa transação; o despachante publica depois.</p><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/adr/ADR-003-transactional-outbox.md" target="_blank" rel="noopener noreferrer">Ler decisão e custo ↗</a></article><article class="decision-card"><span class="card-index">ADR-004 / FILA LOCAL</span><div class="decision-rule"></div><h3>O consumidor falhou.</h3><p><b>Problema.</b> Uma falha temporária precisa de nova tentativa; uma falha repetida precisa ficar visível.</p><p><b>Escolha.</b> Backoff, limite de tentativas, DLQ e redrive explícito.</p><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/adr/ADR-004-fila-local-sqlite.md" target="_blank" rel="noopener noreferrer">Ler decisão e custo ↗</a></article><article class="decision-card"><span class="card-index">ADR-006 / ENTITY RESOLUTION</span><div class="decision-rule"></div><h3>Dois registros, uma pessoa?</h3><p><b>Problema.</b> Fundir pessoas diferentes é difícil de detectar e reverter.</p><p><b>Escolha.</b> O score separa fusão, revisão humana e ausência de correspondência.</p><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/adr/ADR-006-entity-resolution.md" target="_blank" rel="noopener noreferrer">Ler decisão e custo ↗</a></article></div></section>
+
+        <section class="evidence section-wrap" id="evidencias" aria-labelledby="evidence-title"><div><span class="section-kicker">03 / EVIDÊNCIAS</span><h2 id="evidence-title">Melhor numa corrida.<br><em>Pior na seguinte.</em></h2><p>Na fase de desempenho, quatro erros de medição ficaram registrados no relatório. Dois fizeram a mesma configuração aparecer como melhor e como pior. As corridas inconclusivas continuam no repositório.</p><div class="evidence-actions"><a class="button button-primary" href="/">Abrir o Control Center <span aria-hidden="true">↗</span></a><a class="button button-outline" href="https://github.com/Buenno0/nexus-architecture" target="_blank" rel="noopener noreferrer">Ver o código <span aria-hidden="true">↗</span></a></div></div><div class="evidence-list"><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/testing/phase-7-report.md" target="_blank" rel="noopener noreferrer"><span>01</span><strong>Os erros de medição, seção 6</strong><b>↗</b></a><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/adr/README.md" target="_blank" rel="noopener noreferrer"><span>02</span><strong>Decisões e alternativas recusadas</strong><b>↗</b></a><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/testing/README.md" target="_blank" rel="noopener noreferrer"><span>03</span><strong>Limitações atuais</strong><b>↗</b></a><a href="https://github.com/Buenno0/nexus-architecture/blob/main/docs/architecture/diagramas.md" target="_blank" rel="noopener noreferrer"><span>04</span><strong>Diagramas da arquitetura</strong><b>↗</b></a></div></section>
+      </main>
+      <footer class="site-footer"><span class="brand-footer">NEXUS <small>ARCHITECTURE</small></span><span>Projeto pessoal de engenharia de sistemas distribuídos. Dados sintéticos.</span><a href="#inicio">Voltar ao início ↑</a></footer>
+    </div>
+  </body>
+</html>

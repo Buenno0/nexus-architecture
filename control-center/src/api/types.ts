@@ -45,6 +45,8 @@ export interface QueueDepth {
  */
 export interface Metrics {
   scope: "in_process";
+  /** Versoes antigas nao identificam a instancia; nao permitem calcular taxas seguras. */
+  instance_id?: string;
   environment: string;
   outbox_pending: number | null;
   queue: QueueDepth | null;

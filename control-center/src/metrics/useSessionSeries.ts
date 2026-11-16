@@ -29,7 +29,7 @@ export function useSessionSeries(
     if (!valores || chaveDeAtualizacao === undefined) return;
     if (ultimaChave.current === chaveDeAtualizacao) return;
     ultimaChave.current = chaveDeAtualizacao;
-    historico.current.registrar(valores);
+    historico.current.registrar(valores, chaveDeAtualizacao);
     setPontos([...historico.current.listar()]);
   }, [valores, chaveDeAtualizacao]);
 
@@ -40,15 +40,22 @@ export function useSessionSeries(
 export function useRates(
   contadores: Record<string, number> | null,
   chaveDeAtualizacao: number | undefined,
-): Record<string, number> {
+  instancia: string | undefined,
+): { taxas: Record<string, number>; instante: number | undefined } {
   const medidores = useRef(new Map<string, MedidorDeTaxa>());
+  const ultimaInstancia = useRef<string | undefined>(undefined);
   const ultimaChave = useRef<number | undefined>(undefined);
-  const [taxas, setTaxas] = useState<Record<string, number>>({});
+  const [resultado, setResultado] = useState<{ taxas: Record<string, number>; instante: number | undefined }>({ taxas: {}, instante: undefined });
 
   useEffect(() => {
     if (!contadores || chaveDeAtualizacao === undefined) return;
     if (ultimaChave.current === chaveDeAtualizacao) return;
     ultimaChave.current = chaveDeAtualizacao;
+
+    if (!instancia || instancia !== ultimaInstancia.current) {
+      medidores.current.clear();
+      ultimaInstancia.current = instancia;
+    }
 
     const proximas: Record<string, number> = {};
     for (const [chave, valor] of Object.entries(contadores)) {
@@ -57,12 +64,12 @@ export function useRates(
         medidor = new MedidorDeTaxa();
         medidores.current.set(chave, medidor);
       }
-      const taxa = medidor.medir(valor);
+      const taxa = medidor.medir(valor, chaveDeAtualizacao);
       // null = primeira leitura ou reinicio da API. Omitir e mais honesto que zerar.
-      if (taxa !== null) proximas[chave] = taxa;
+      if (instancia && taxa !== null) proximas[chave] = taxa;
     }
-    setTaxas(proximas);
-  }, [contadores, chaveDeAtualizacao]);
+    setResultado({ taxas: proximas, instante: chaveDeAtualizacao });
+  }, [contadores, chaveDeAtualizacao, instancia]);
 
-  return taxas;
+  return resultado;
 }

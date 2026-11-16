@@ -13,7 +13,9 @@ Percentis em vez de media: a media esconde a cauda. Com 95 requisicoes de 10 ms 
 
 from __future__ import annotations
 
+import os
 import threading
+import uuid
 from collections import Counter, deque
 from typing import Any
 
@@ -29,6 +31,8 @@ class MetricsRegistry:
         self._counters: Counter[str] = Counter()
         self._samples: dict[str, deque[float]] = {}
         self._max_samples = max_samples
+        self._pid = os.getpid()
+        self._instance_id = uuid.uuid4().hex
 
     def increment(self, name: str, amount: int = 1, **labels: str) -> None:
         key = _key(name, labels)
@@ -51,11 +55,15 @@ class MetricsRegistry:
 
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
+            if self._pid != os.getpid():
+                self._pid = os.getpid()
+                self._instance_id = uuid.uuid4().hex
             counters = dict(self._counters)
             latencies = {
                 name: _summarize(list(series)) for name, series in self._samples.items() if series
             }
-        return {"counters": counters, "latency_ms": latencies}
+            instance_id = self._instance_id
+        return {"counters": counters, "latency_ms": latencies, "instance_id": instance_id}
 
 
 def _key(name: str, labels: dict[str, str]) -> str:

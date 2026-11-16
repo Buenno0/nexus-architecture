@@ -79,7 +79,10 @@ class TestMetricsRegistry:
         reg.increment("a")
         reg.observe("b", 1.0)
         reg.reset()
-        assert reg.snapshot() == {"counters": {}, "latency_ms": {}}
+        snapshot = reg.snapshot()
+        assert snapshot["counters"] == {}
+        assert snapshot["latency_ms"] == {}
+        assert len(snapshot["instance_id"]) == 32
 
     def test_serie_vazia_nao_quebra(self) -> None:
         assert _percentile([], 0.5) == 0.0

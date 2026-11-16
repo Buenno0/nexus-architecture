@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { Arquitetura } from "./Arquitetura";
@@ -6,7 +6,7 @@ import { Arquitetura } from "./Arquitetura";
 describe("tela de arquitetura", () => {
   it("lista os cinco mecanismos na ordem da jornada", () => {
     render(<Arquitetura />);
-    const nomes = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+    const nomes = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent).filter((h) => h !== "Ingestion API");
     expect(nomes).toEqual([
       "Idempotencia",
       "Transactional outbox",
@@ -14,6 +14,14 @@ describe("tela de arquitetura", () => {
       "Resolucao de identidade",
       "Trilha",
     ]);
+  });
+
+  it("explica dependencias e limites do componente escolhido", () => {
+    render(<Arquitetura />);
+    fireEvent.click(screen.getByRole("button", { name: "Observability" }));
+    expect(screen.getByText(/camada transversal, nao servico separado/)).toBeInTheDocument();
+    expect(screen.getByText(/Trilha best-effort pode ter lacunas/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ADR-010 ↗" })).toHaveAttribute("href", expect.stringContaining("ADR-010-observabilidade.md"));
   });
 
   it("cada desenho tem descricao textual", () => {

@@ -9,15 +9,13 @@ import { useRates, useSessionSeries } from "../metrics/useSessionSeries";
 export function ApiMonitoring() {
   const metrics = useMetrics();
   const contadores = metrics.data?.counters ?? null;
-  const taxas = useRates(contadores, metrics.dataUpdatedAt);
-
-  const requisicoesPorSegundo = Object.entries(taxas)
-    .filter(([k]) => k.startsWith("http_requests_total"))
-    .reduce((s, [, v]) => s + v, 0);
+  const totalParaTaxa = contadores ? somarPorNome(contadores, "http_requests_total") : null;
+  const medida = useRates(totalParaTaxa === null ? null : { http: totalParaTaxa }, metrics.dataUpdatedAt, metrics.data?.instance_id);
+  const requisicoesPorSegundo = medida.instante === metrics.dataUpdatedAt ? medida.taxas.http : undefined;
 
   const serie = useSessionSeries(
-    contadores ? { rps: Number(requisicoesPorSegundo.toFixed(2)) } : null,
-    metrics.dataUpdatedAt,
+    requisicoesPorSegundo === undefined ? null : { rps: Number(requisicoesPorSegundo.toFixed(2)) },
+    medida.instante,
   );
 
   if (metrics.isError) {
@@ -42,10 +40,10 @@ export function ApiMonitoring() {
           <StatTile rotulo="total de requisicoes" valor={total} origem="processo" />
           <StatTile
             rotulo="requisicoes por segundo"
-            valor={Object.keys(taxas).length > 0 ? requisicoesPorSegundo : null}
+            valor={requisicoesPorSegundo ?? null}
             unidade="req/s"
             origem="sessao"
-            dica="Calculado a partir da diferenca entre duas leituras do contador."
+            dica="Calculado entre duas leituras da mesma instancia. APIs sem identificador nao fornecem taxa verificavel."
           />
           <StatTile
             rotulo="respostas 4xx e 5xx"
@@ -54,10 +52,11 @@ export function ApiMonitoring() {
             estado={erros > 0 ? "atencao" : "normal"}
           />
           <StatTile
-            rotulo="taxa de erro"
+            rotulo="taxa de respostas 4xx e 5xx"
             valor={total && total > 0 ? (erros / total) * 100 : null}
             unidade="%"
             origem="processo"
+            dica="Proporcao calculada dos contadores deste processo. O alerta usa apenas 5xx."
             estado={total && erros / total > 0.05 ? "erro" : "normal"}
           />
         </Grade>
@@ -65,7 +64,7 @@ export function ApiMonitoring() {
 
       <Panel
         titulo="Requisicoes por segundo ao longo da sessao"
-        descricao="A API nao guarda serie temporal; esta e montada aqui a partir do polling."
+        descricao="Taxa calculada entre leituras da mesma instancia. APIs antigas sem identificador nao fornecem taxa verificavel; a serie vive nesta aba."
       >
         <Chart pontos={serie} series={[{ chave: "rps", rotulo: "req/s" }]} />
       </Panel>

@@ -13,7 +13,7 @@ const DESCRICAO: Record<Origem, { curto: string; titulo: string }> = {
   persistido: {
     curto: "persistido",
     titulo:
-      "Vem do armazenamento. Sobrevive a reinicio e e consistente entre processos.",
+      "Vem do armazenamento ou de um servico de fila. Valores do SQS sao aproximados.",
   },
   processo: {
     curto: "processo",

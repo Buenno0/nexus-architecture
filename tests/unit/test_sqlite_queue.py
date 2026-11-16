@@ -338,7 +338,7 @@ class TestRecibosPorMensagem:
             queue.publish(msg(i))
         recebidas = queue.receive(max_messages=3)
 
-        assert queue.dead_letter(recebidas[0].receipt, error="envenenada") is True
+        assert queue.dead_letter(recebidas[0], error="envenenada") is True
 
         stats = queue.stats()
         assert stats.dead == 1

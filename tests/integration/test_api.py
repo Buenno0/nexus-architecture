@@ -287,6 +287,8 @@ class TestObservabilidade:
         corpo = client.get("/metrics").json()
 
         assert corpo["scope"] == "in_process"
+        assert len(corpo["instance_id"]) == 32
+        assert client.get("/metrics").json()["instance_id"] == corpo["instance_id"]
         assert corpo["modules"]["queue_engine"] == "implemented"
         # Era "not_implemented" fixo no codigo desde a Fase 2; a Fase 5
         # implementou a resolucao e o campo so foi corrigido na Fase 4,
