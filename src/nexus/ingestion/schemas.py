@@ -312,6 +312,7 @@ class DemoSeedOut(BaseModel):
     #: de a proxima chamada ser recusada.
     quota_used: int
     quota_total: int
+    record_ids: list[str] = Field(default_factory=list)
 
 
 # -------------------------------------------------------------------- observability

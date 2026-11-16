@@ -113,6 +113,10 @@ class TestSemeadura:
         assert corpo["failed"] == 0
         assert corpo["quota_used"] == 10
         assert corpo["quota_total"] == 50
+        assert len(corpo["record_ids"]) == 10
+        assert all(
+            repositorio.get_record(record_id) is not None for record_id in corpo["record_ids"]
+        )
 
     def test_produz_duplicatas_para_a_resolucao_ter_o_que_mostrar(self, demo: TestClient) -> None:
         """Acervo so de registros distintos nao produz par, fusao nem revisao."""

@@ -194,6 +194,7 @@ export interface SemeaduraOut {
   failed: number;
   quota_used: number;
   quota_total: number;
+  record_ids?: string[];
 }
 
 /**

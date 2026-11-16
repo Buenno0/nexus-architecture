@@ -13,6 +13,7 @@ import "./Arquitetura.css";
 import { Panel } from "../components/Panel";
 import { Pipeline } from "../components/Pipeline";
 import { ArchitectureExplorer } from "../components/ArchitectureExplorer";
+import { JornadaViva } from "../components/JornadaViva";
 
 const BORDA = "var(--borda-forte)";
 const CAIXA = "var(--superficie-alta)";
@@ -175,15 +176,10 @@ const MECANISMOS = [
 export function Arquitetura() {
   return (
     <>
-      <div className="arq__intro">
-        <h2 className="arq__titulo">Como uma observacao atravessa o Nexus</h2>
-        <p className="arq__sub">
-          Cinco mecanismos, cada um respondendo a um problema concreto de sistemas
-          distribuidos. As demais abas mostram esses mecanismos funcionando com dados
-          reais — sinteticos, gerados pelo proprio servidor.
-        </p>
-      </div>
+      <JornadaViva />
 
+      <details className="arq__detalhes">
+      <summary>Quer entender como funciona por dentro?</summary>
       <ArchitectureExplorer />
 
       <Panel
@@ -192,7 +188,6 @@ export function Arquitetura() {
       >
         <Pipeline />
       </Panel>
-
       <Panel
         titulo="Mecanismos"
         descricao="Na ordem em que um registro os encontra."
@@ -208,6 +203,7 @@ export function Arquitetura() {
           </div>
         ))}
       </Panel>
+      </details>
     </>
   );
 }

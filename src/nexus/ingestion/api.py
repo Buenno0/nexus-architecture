@@ -1038,6 +1038,7 @@ async def demo_seed(
     lote = _seed_batch(pedido.count, record_type)
 
     aceitos = duplicados = falhas = 0
+    record_ids: list[str] = []
     for registro in lote:
         try:
             resultado = await run_in_threadpool(
@@ -1063,6 +1064,9 @@ async def demo_seed(
             aceitos += 1
         else:
             duplicados += 1
+        record_id = resultado.body.get("record_id")
+        if isinstance(record_id, str):
+            record_ids.append(record_id)
 
     logger.info(
         "demo_seed_completed",
@@ -1075,4 +1079,5 @@ async def demo_seed(
         failed=falhas,
         quota_used=total,
         quota_total=settings.demo_max_total,
+        record_ids=record_ids,
     )

@@ -144,3 +144,6 @@
     gap: calc(var(--espaco) * 2);
   }
 }
+
+.arq__detalhes { margin-top: 24px; }
+.arq__detalhes > summary { cursor: pointer; color: var(--texto); font-size: 16px; font-weight: 650; padding: 16px 2px; }
