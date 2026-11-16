@@ -73,10 +73,9 @@ Causa comum do maior grupo. A Fase 3 aplicou, verificou e destruiu.
   conta tem cota de 10 execucoes concorrentes, e qualquer vazao medida la seria a cota.
 - `NEXUS_DYNAMO_MAX_POOL_CONNECTIONS` nao foi validado onde importaria. Local nao teve
   efeito mensuravel (100,6 contra 100,8 req/s).
-- A amostragem da serie pelo EventBridge Scheduler existe, e testada localmente e
-  **nunca foi exercitada na nuvem**.
+- A amostragem da serie pelo EventBridge Scheduler foi observada drenando a fila na
+  nuvem (phase-9-report, secao 6b), mas nao ha teste que a exercite de proposito.
 - O login por Cognito tem teste de componente, nao de integracao.
-- O Control Center nao esta publicado na Vercel.
 - O primeiro deploy usaria `AdministratorAccess` — divida registrada no runbook.
 
 ### Decisoes deliberadas, nao pendencias

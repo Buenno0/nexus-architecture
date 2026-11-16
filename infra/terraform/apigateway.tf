@@ -83,8 +83,13 @@ locals {
   }
 
   # Semeadura: o cliente escolhe QUANTOS registros, nunca o que eles dizem.
+  # Passo: o cliente escolhe QUANDO o trabalho acontece, nunca quanto dele.
+  #
+  # Metodo explicito pelo mesmo motivo de `ops_read` — `ANY` casaria com OPTIONS e o
+  # preflight cairia no authorizer, que recusa por falta de Authorization.
   demo_routes = {
-    demo_seed = "POST /v1/demo/seed"
+    demo_seed    = "POST /v1/demo/seed"
+    demo_advance = "POST /v1/demo/advance"
   }
 
   operator_routes = {

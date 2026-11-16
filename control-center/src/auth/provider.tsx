@@ -33,6 +33,15 @@ interface AuthState {
   usuario: string | null;
   erro: string | null;
   entrando: boolean;
+  /**
+   * O login automatico de convidado esta em curso.
+   *
+   * Existe para o chamador nao mostrar o formulario de login durante essa janela. Sem
+   * isso, quem abre a demonstracao publica ve um pedido de usuario e senha piscar por
+   * dois segundos antes de entrar sozinho — e a primeira impressao do painel vira uma
+   * porta trancada. Falhando, vira `false` e o formulario aparece com o erro.
+   */
+  autenticandoConvidado: boolean;
   entrar: (usuario: string, senha: string) => Promise<void>;
   sair: () => void;
 }
@@ -129,6 +138,17 @@ export function AuthProvider({
     setErro(null);
   }, []);
 
+  // Verdadeiro desde o primeiro render ate a sessao chegar ou a tentativa falhar.
+  // Nao depende de `entrando`, que so vira true depois que o efeito acima roda: a
+  // janela entre o primeiro render e o efeito e justamente onde o formulario piscava.
+  const autenticandoConvidado =
+    modo === "cognito" &&
+    config.demoMode &&
+    config.demoGuest.usuario !== "" &&
+    config.demoGuest.senha !== "" &&
+    sessao === null &&
+    erro === null;
+
   const valor = useMemo<AuthState>(
     () => ({
       modo,
@@ -136,10 +156,11 @@ export function AuthProvider({
       usuario: sessao?.usuario ?? null,
       erro,
       entrando,
+      autenticandoConvidado,
       entrar,
       sair,
     }),
-    [modo, sessao, erro, entrando, entrar, sair],
+    [modo, sessao, erro, entrando, autenticandoConvidado, entrar, sair],
   );
 
   return <AuthContext.Provider value={valor}>{children}</AuthContext.Provider>;

@@ -329,3 +329,40 @@
   font-size: 11px;
   color: var(--texto-fraco);
 }
+
+/* Espera do login automatico de convidado.
+   Deliberadamente quieta: nao e um carregamento que o visitante pediu, entao nao
+   merece spinner nem barra. So evita a tela em branco e o formulario piscando. */
+.abrindo {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  min-height: 100vh;
+}
+
+.abrindo__marca {
+  color: var(--texto);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+}
+
+.abrindo__nota {
+  color: var(--texto-fraco);
+  font-size: 12px;
+}
+
+/* Volta do console para a pagina publica. A marca vira o caminho de volta: sem ela,
+   quem abre o painel nao tem como voltar a narrativa a nao ser apagando o hash. */
+.topo__voltar {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.topo__voltar:hover .topo__nome {
+  text-decoration: underline;
+}

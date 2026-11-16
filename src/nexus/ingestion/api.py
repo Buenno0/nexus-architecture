@@ -23,6 +23,7 @@ from nexus.demo import synthetic
 from nexus.ingestion.schemas import (
     AlertOut,
     AlertsOut,
+    DemoAdvanceOut,
     DemoSeedOut,
     DemoSeedRequest,
     DispatchOut,
@@ -146,11 +147,19 @@ ServiceDep = Annotated[IngestionService, Depends(get_service)]
 IdempotencyKeyDep = Annotated[str, Depends(require_idempotency_key)]
 
 
+#: As unicas escritas que a demonstracao publica aceita.
+#:
+#: Nenhuma delas deixa o visitante escolher CONTEUDO: em ``seed`` ele escolhe quantos
+#: registros, em ``advance`` escolhe quando o trabalho acontece. O que os registros
+#: dizem e quanto trabalho cada passo faz continuam sendo decisao do servidor.
+DEMO_WRITE_PATHS = frozenset({"/v1/demo/seed", "/v1/demo/advance"})
+
+
 def _demo_write_guard(request: Request, settings: SettingsDep) -> None:
     """Novas rotas de escrita tambem devem nascer fechadas na demo publica."""
     if not settings.demo_mode or request.method in {"GET", "HEAD", "OPTIONS"}:
         return
-    if request.method == "POST" and request.url.path == "/v1/demo/seed":
+    if request.method == "POST" and request.url.path in DEMO_WRITE_PATHS:
         return
     raise DemoDisabledError("Operacao indisponivel na demonstracao publica")
 
@@ -1080,4 +1089,93 @@ async def demo_seed(
         quota_used=total,
         quota_total=settings.demo_max_total,
         record_ids=record_ids,
+    )
+
+
+#: Tetos de um passo da demonstracao.
+#:
+#: Um passo consome em rodadas porque a fila e compartilhada: os registros que o
+#: visitante acabou de enviar entram atras do que ja estava la. Com uma rodada so de 10
+#: mensagens, um acervo com backlog faria o visitante apertar o botao dezenas de vezes
+#: sem nunca ver o proprio lote andar.
+#:
+#: O teto continua sendo do servidor: no maximo
+#: ``DEMO_ADVANCE_MAX_BATCHES * DEMO_ADVANCE_MAX_MESSAGES`` mensagens por chamada. Um
+#: teto alto demais transformaria a rota numa alavanca para fazer a conta trabalhar de
+#: graca; sobrando trabalho, a interface pede outro passo, e cada passo volta a passar
+#: pelo throttle do API Gateway.
+DEMO_ADVANCE_DISPATCH_LIMIT = 25
+DEMO_ADVANCE_MAX_MESSAGES = 10
+DEMO_ADVANCE_MAX_BATCHES = 12
+
+
+@app.post(
+    "/v1/demo/advance",
+    response_model=DemoAdvanceOut,
+    summary="Despacha o outbox e consome um lote (modo demonstracao)",
+    responses={404: {"model": ErrorOut, "description": "Fora do modo demonstracao"}},
+    tags=["demo"],
+)
+async def demo_advance(
+    repository: RepositoryDep, queue: QueueDep, settings: SettingsDep
+) -> DemoAdvanceOut:
+    """Faz o trabalho andar porque alguem pediu.
+
+    **Esta rota existe por causa da tese, nao apesar dela.** Nada no Nexus processa
+    sozinho: nao ha worker residente nem event source mapping de SQS para Lambda
+    (ADR-003). Na demonstracao publica as rotas de ``/v1/ops/*`` estao fechadas, entao
+    o unico gatilho que restava era a rede de seguranca do EventBridge, a cada 15
+    minutos — e quem visitava via o proprio registro parar em ``accepted`` e nunca
+    chegar a uma decisao.
+
+    Esperar 15 minutos nao demonstra execucao sob demanda: demonstra um agendamento.
+    Aqui o visitante aperta e o trabalho acontece, que e exatamente o que a arquitetura
+    afirma.
+
+    Nao ha corpo de pedido: os tetos sao do servidor. O passo nao cria nada e nao
+    consome a cota de semeadura — ele so move o que ja existe.
+    """
+    if not settings.demo_mode:
+        raise DemoDisabledError("Rota nao encontrada")
+
+    dispatcher = OutboxDispatcher(repository, queue, settings)
+    despacho = await run_in_threadpool(
+        dispatcher.dispatch_once, limit=DEMO_ADVANCE_DISPATCH_LIMIT
+    )
+
+    worker = Worker(repository, queue, settings=settings)
+    recebidas = processadas = repetidas = dead = rodadas = 0
+    duracao = 0.0
+    while rodadas < DEMO_ADVANCE_MAX_BATCHES:
+        consumo = await run_in_threadpool(
+            worker.process_once, max_messages=DEMO_ADVANCE_MAX_MESSAGES
+        )
+        rodadas += 1
+        recebidas += consumo.received
+        processadas += consumo.processed
+        repetidas += consumo.skipped_duplicate
+        dead += consumo.dead_lettered
+        duracao += consumo.duration_ms
+        # Fila vazia encerra o passo. Insistir so gastaria chamadas para receber zero.
+        if consumo.received == 0:
+            break
+
+    # Lidos depois do passo, nao antes: o numero que a interface mostra e o que sobrou.
+    restante_outbox = await run_in_threadpool(repository.count_pending_outbox)
+    fila = await run_in_threadpool(queue.stats)
+
+    logger.info(
+        "demo_advance_completed",
+        extra={"dispatched": despacho.dispatched, "processed": processadas, "batches": rodadas},
+    )
+    return DemoAdvanceOut(
+        dispatched=despacho.dispatched,
+        received=recebidas,
+        processed=processadas,
+        skipped_duplicate=repetidas,
+        dead_lettered=dead,
+        duration_ms=round(duracao, 3),
+        outbox_pending=restante_outbox,
+        queue_pending=fila.pending,
+        batches=rodadas,
     )

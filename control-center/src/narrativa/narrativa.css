@@ -1,0 +1,633 @@
+/*
+ * A pagina publica.
+ *
+ * TUDO AQUI E ESCOPADO EM `.narrativa`.
+ *
+ * O painel e a narrativa compartilham a mesma folha de estilo global, e nomes
+ * genericos colidem: `.nota` da narrativa pegou `display: flex` de uma `.nota` do
+ * console (App.css) e a frase virou tres colunas. O escopo custa um seletor a mais e
+ * resolve a classe inteira de defeito, nao esta ocorrencia.
+ *
+ * Tudo sai de `tokens.css`. Nenhum hex, nenhum tamanho e nenhum espaco escrito a mao
+ * neste arquivo — foi assim que o painel antigo acumulou tres paletas.
+ */
+
+.narrativa {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--fonte-texto);
+  font-size: var(--t-corpo);
+  line-height: var(--altura-texto);
+  min-height: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* `.ressalva` e nao `.nota`: `.nota` ja existe em App.css como linha flex do
+   console. O escopo sobe a especificidade, mas so para as propriedades declaradas
+   aqui — o `display: flex` de la continuava valendo e a frase virava colunas. */
+
+/* ---- Cabecalho ---------------------------------------------------------- */
+
+.narrativa .cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-4);
+  max-width: var(--largura-pagina);
+  margin: 0 auto;
+  padding: var(--e-5) var(--e-5);
+  border-bottom: 1px solid var(--linha);
+}
+
+.narrativa .cabecalho__marca {
+  display: flex;
+  align-items: baseline;
+  gap: var(--e-3);
+  min-width: 0;
+}
+
+.narrativa .cabecalho__nome {
+  color: var(--tinta);
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.2em;
+}
+
+.narrativa .cabecalho__linha {
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .cabecalho__links {
+  display: flex;
+  align-items: center;
+  gap: var(--e-5);
+  flex: none;
+}
+
+/* ---- Elo: um botao que se comporta como link ---------------------------- */
+/* Abrir o painel e navegacao interna, nao um destino: botao com aparencia de link
+   mantem o papel certo para o teclado e para o leitor de tela. */
+
+.narrativa .elo,
+.narrativa .cabecalho__links a,
+.narrativa .rodape-narrativa a {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--azul);
+  font: inherit;
+  font-size: var(--t-apoio);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.narrativa .elo:hover,
+.narrativa .cabecalho__links a:hover,
+.narrativa .rodape-narrativa a:hover {
+  text-decoration: underline;
+}
+
+.narrativa :focus-visible {
+  outline: 2px solid var(--azul);
+  outline-offset: 3px;
+  border-radius: var(--r-1);
+}
+
+/* ---- Ritmo da pagina ---------------------------------------------------- */
+
+.narrativa .pagina {
+  max-width: var(--largura-pagina);
+  margin: 0 auto;
+  padding: 0 var(--e-5);
+}
+
+.narrativa .secao {
+  padding: var(--e-9) 0;
+  border-bottom: 1px solid var(--linha);
+}
+
+.narrativa .secao:last-child {
+  border-bottom: 0;
+}
+
+.narrativa .sobrelinha {
+  margin: 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* ---- Secao 1: a pergunta ------------------------------------------------ */
+
+.narrativa .pergunta__titulo {
+  margin: var(--e-4) 0 0;
+  max-width: 18ch;
+  font-family: var(--fonte-display);
+  font-size: var(--t-hero);
+  font-weight: var(--peso-display);
+  line-height: var(--altura-apertada);
+  letter-spacing: -0.04em;
+}
+
+/* A segunda metade da pergunta e o que importa; o italico separa sem precisar de
+   outra cor, que roubaria a funcao do acento. */
+.narrativa .pergunta__titulo em {
+  font-style: italic;
+  font-weight: var(--peso-normal);
+}
+
+.narrativa .pergunta__lead {
+  margin: var(--e-5) 0 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-suave);
+  font-size: var(--t-corpo-g);
+}
+
+.narrativa .par {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-4);
+  margin-top: var(--e-7);
+}
+
+.narrativa .ficha {
+  background: var(--papel-2);
+  border: 1px solid var(--linha);
+  border-radius: var(--r-3);
+  padding: var(--e-5);
+}
+
+.narrativa .ficha__fonte {
+  margin: 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.narrativa .ficha__nome {
+  margin: var(--e-3) 0 var(--e-5);
+  font-family: var(--fonte-display);
+  font-size: var(--t-destaque);
+  font-weight: var(--peso-normal);
+  line-height: var(--altura-titulo);
+  letter-spacing: -0.02em;
+}
+
+.narrativa .ficha__campos {
+  margin: 0;
+  display: grid;
+  gap: var(--e-3);
+}
+
+.narrativa .ficha__campo {
+  display: grid;
+  gap: var(--e-1);
+}
+
+.narrativa .ficha__campo dt {
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+}
+
+.narrativa .ficha__valor {
+  margin: 0;
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+  overflow-wrap: anywhere;
+}
+
+/* O destaque nao e so a cor: o valor fica mais escuro e ganha fundo, e a nota
+   abaixo do par diz em palavras o que esta destacado. */
+.narrativa .ficha__valor--igual {
+  display: inline-block;
+  background: var(--match-lavado);
+  border-radius: var(--r-1);
+  padding: 0 var(--e-1);
+  color: var(--match);
+  font-weight: var(--peso-medio);
+}
+
+.narrativa .par__nota {
+  margin: var(--e-3) 0 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .pergunta__consequencia {
+  margin-top: var(--e-7);
+  border-left: 2px solid var(--ouro);
+  padding-left: var(--e-5);
+}
+
+.narrativa .pergunta__consequencia p {
+  margin: 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-suave);
+  font-size: var(--t-corpo);
+}
+
+.narrativa .pergunta__consequencia strong {
+  color: var(--tinta);
+}
+
+/* ---- Rodape ------------------------------------------------------------- */
+
+.narrativa .rodape-narrativa {
+  max-width: var(--largura-pagina);
+  margin: 0 auto;
+  padding: var(--e-7) var(--e-5) var(--e-8);
+  border-top: 1px solid var(--linha);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--e-5);
+  flex-wrap: wrap;
+}
+
+.narrativa .rodape-narrativa p {
+  margin: 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .rodape-narrativa__links {
+  display: flex;
+  gap: var(--e-5);
+  flex: none;
+}
+
+/* ---- Celular (ver os pontos de quebra em tokens.css) -------------------- */
+
+@media (max-width: 640px) {
+  .narrativa .cabecalho {
+    flex-wrap: wrap;
+    gap: var(--e-3);
+    padding: var(--e-4);
+  }
+
+  .narrativa .cabecalho__marca {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .narrativa .pagina {
+    padding: 0 var(--e-4);
+  }
+
+  .narrativa .secao {
+    padding: var(--e-7) 0;
+  }
+
+  .narrativa .pergunta__titulo {
+    max-width: none;
+  }
+
+  .narrativa .par {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .narrativa .rodape-narrativa {
+    padding: var(--e-6) var(--e-4) var(--e-7);
+  }
+}
+
+/* ---- Titulos de secao --------------------------------------------------- */
+
+.narrativa .titulo {
+  margin: var(--e-4) 0 0;
+  max-width: 22ch;
+  font-family: var(--fonte-display);
+  font-size: var(--t-titulo);
+  font-weight: var(--peso-display);
+  line-height: var(--altura-titulo);
+  letter-spacing: -0.03em;
+}
+
+.narrativa .lead {
+  margin: var(--e-4) 0 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-suave);
+}
+
+.narrativa .ressalva,
+.narrativa .legenda,
+.narrativa .acoes__nota {
+  max-width: var(--largura-texto);
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+/* O ULID nao cabe no fim de uma linha e nao tem onde quebrar; deixa-lo inline fazia
+   a frase abrir um buraco e o id cair sozinho num bloco. Em linha propria ele e
+   legivel e a frase continua uma frase. */
+.narrativa .ressalva p {
+  margin: 0;
+}
+
+.narrativa .ressalva__id {
+  margin: var(--e-1) 0;
+  font-family: var(--fonte-mono);
+  font-size: var(--t-micro);
+  overflow-wrap: anywhere;
+}
+
+.narrativa .aviso {
+  max-width: var(--largura-texto);
+  margin: var(--e-4) 0 0;
+  border-left: 2px solid var(--falha);
+  padding-left: var(--e-4);
+  color: var(--falha);
+  font-size: var(--t-apoio);
+}
+
+/* ---- Secao 2: acoes ----------------------------------------------------- */
+
+.narrativa .acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-3);
+  margin-top: var(--e-6);
+}
+
+.narrativa .botao {
+  background: var(--azul);
+  border: 1px solid var(--azul);
+  border-radius: var(--r-botao);
+  padding: var(--e-3) var(--e-5);
+  color: var(--papel);
+  font: inherit;
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-forte);
+  cursor: pointer;
+  transition: background var(--mov-rapido) var(--mov-curva);
+}
+
+.narrativa .botao:hover:not(:disabled) {
+  background: var(--azul-escuro);
+}
+
+.narrativa .botao--segundo {
+  background: var(--papel);
+  color: var(--azul);
+}
+
+.narrativa .botao--segundo:hover:not(:disabled) {
+  background: var(--azul-lavado);
+}
+
+.narrativa .botao:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.narrativa .acoes__nota {
+  margin: var(--e-4) 0 0;
+}
+
+/* ---- Secao 2: o percurso ------------------------------------------------ */
+/* Lista, nao desenho: cada parada e um item que o leitor de tela percorre, e a
+   coluna no celular dispensa o "arraste para o lado" do SVG antigo. */
+
+.narrativa .percurso {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--e-4);
+  list-style: none;
+  margin: var(--e-7) 0 0;
+  padding: 0;
+}
+
+.narrativa .parada {
+  position: relative;
+  border-top: 2px solid var(--linha-forte);
+  padding-top: var(--e-4);
+  transition: border-color var(--mov-medio) var(--mov-curva);
+}
+
+.narrativa .parada--feita {
+  border-top-color: var(--azul);
+}
+
+.narrativa .parada__marca {
+  display: block;
+  width: var(--e-3);
+  height: var(--e-3);
+  margin-bottom: var(--e-3);
+  border: 2px solid var(--linha-forte);
+  border-radius: var(--r-circulo);
+  background: var(--papel);
+  transition:
+    background var(--mov-medio) var(--mov-curva),
+    border-color var(--mov-medio) var(--mov-curva);
+}
+
+.narrativa .parada--feita .parada__marca {
+  background: var(--azul);
+  border-color: var(--azul);
+}
+
+.narrativa .parada__nome {
+  display: block;
+  color: var(--tinta);
+  font-size: var(--t-corpo);
+  font-weight: var(--peso-forte);
+}
+
+.narrativa .parada__faz {
+  display: block;
+  margin-top: var(--e-1);
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+/* O estado tambem e palavra: quem nao distingue a cor do marcador le aqui. */
+.narrativa .parada__estado {
+  display: block;
+  margin-top: var(--e-2);
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.narrativa .parada--feita .parada__estado {
+  color: var(--azul);
+  font-weight: var(--peso-forte);
+}
+
+.narrativa .legenda {
+  margin: var(--e-5) 0 0;
+  color: var(--tinta-suave);
+  font-size: var(--t-corpo);
+}
+
+.narrativa .ressalva {
+  margin: var(--e-3) 0 0;
+}
+
+/* ---- Secao 3: o veredito ------------------------------------------------ */
+
+.narrativa .veredito {
+  margin-top: var(--e-6);
+  border-left: 2px solid var(--ouro);
+  padding-left: var(--e-5);
+}
+
+.narrativa .veredito__palavra {
+  margin: 0;
+  font-family: var(--fonte-display);
+  font-size: var(--t-secao);
+  font-weight: var(--peso-normal);
+  letter-spacing: -0.02em;
+}
+
+.narrativa .veredito--match {
+  color: var(--match);
+}
+.narrativa .veredito--duvida {
+  color: var(--duvida);
+}
+.narrativa .veredito--falha {
+  color: var(--falha);
+}
+
+.narrativa .veredito__nomes {
+  margin: var(--e-2) 0 0;
+  color: var(--tinta);
+  font-size: var(--t-corpo-g);
+}
+
+.narrativa .veredito__razao {
+  margin: var(--e-2) 0 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-fraca);
+  font-size: var(--t-apoio);
+}
+
+/* ---- Secao 3: a tabela de evidencia ------------------------------------- */
+
+.narrativa .evidencia {
+  width: 100%;
+  margin-top: var(--e-6);
+  border-collapse: collapse;
+  font-size: var(--t-apoio);
+  text-align: left;
+}
+
+.narrativa .evidencia__legenda {
+  max-width: var(--largura-texto);
+  margin-bottom: var(--e-3);
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+  text-align: left;
+}
+
+.narrativa .evidencia th,
+.narrativa .evidencia td {
+  border-bottom: 1px solid var(--linha);
+  padding: var(--e-3) var(--e-3) var(--e-3) 0;
+  vertical-align: top;
+}
+
+.narrativa .evidencia thead th {
+  border-bottom-color: var(--linha-forte);
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.narrativa .evidencia tbody th {
+  color: var(--tinta);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+}
+
+.narrativa .evidencia__num,
+.narrativa .score__num {
+  font-family: var(--fonte-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--t-nota);
+}
+
+.narrativa .evidencia__valor {
+  color: var(--tinta-suave);
+  overflow-wrap: anywhere;
+}
+
+.narrativa .score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--e-2);
+  border-radius: var(--r-1);
+  padding: 0 var(--e-2);
+  font-weight: var(--peso-medio);
+  white-space: nowrap;
+}
+
+.narrativa .score--alto {
+  background: var(--match-lavado);
+  color: var(--match);
+}
+.narrativa .score--medio {
+  background: var(--duvida-lavado);
+  color: var(--duvida);
+}
+.narrativa .score--nulo {
+  background: var(--papel-3);
+  color: var(--tinta-fraca);
+}
+
+/* ---- Secao 3: as tres faixas -------------------------------------------- */
+
+.narrativa .faixas {
+  margin-top: var(--e-7);
+  background: var(--papel-2);
+  border-radius: var(--r-3);
+  padding: var(--e-5);
+}
+
+.narrativa .faixas__titulo {
+  margin: 0;
+  font-family: var(--fonte-display);
+  font-size: var(--t-destaque);
+  font-weight: var(--peso-normal);
+  letter-spacing: -0.02em;
+}
+
+.narrativa .faixas__texto {
+  margin: var(--e-3) 0 0;
+  max-width: var(--largura-texto);
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .faixas__texto strong {
+  color: var(--tinta);
+}
+
+@media (max-width: 640px) {
+  .narrativa .titulo {
+    max-width: none;
+  }
+
+  .narrativa .percurso {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--e-5);
+  }
+
+  /* A tabela de evidencia tem cinco colunas e nao cabe; rolar so ela e melhor que
+     espremer os valores a ponto de nao dar para compara-los. */
+  .narrativa .evidencia {
+    display: block;
+    overflow-x: auto;
+  }
+}

@@ -212,6 +212,32 @@ export function semear(
   });
 }
 
+export interface AvancoOut {
+  dispatched: number;
+  received: number;
+  processed: number;
+  skipped_duplicate: number;
+  dead_lettered: number;
+  duration_ms: number;
+  outbox_pending: number;
+  queue_pending: number;
+  batches: number;
+}
+
+/**
+ * Pede um passo de processamento, em modo demonstracao.
+ *
+ * Contrapartida de `semear`: la o visitante escolhe quantos registros, aqui escolhe
+ * quando o trabalho acontece. Os tetos sao do servidor, entao nao ha corpo de pedido.
+ *
+ * Existe porque nada no Nexus processa sozinho (ADR-003). Sem esta rota, o registro do
+ * visitante ficava em `accepted` ate a rede de seguranca do EventBridge rodar, 15
+ * minutos depois — e esperar um agendamento nao demonstra execucao sob demanda.
+ */
+export function avancar(): Promise<AvancoOut> {
+  return request<AvancoOut>("/v1/demo/advance", { method: "POST" });
+}
+
 /** Ingestao de um registro sintetico. Cada envio e uma operacao distinta — ADR-002. */
 export function ingerir(
   tipo: "person" | "organization",

@@ -1,0 +1,145 @@
+/*
+ * Sistema visual do Nexus.
+ *
+ * Um sistema so, claro, para a pagina que conta a historia. O console de operador
+ * continua escuro e mantem os tokens antigos em `theme.css` — mas os nomes nao
+ * colidem (`--tinta` x `--texto`, `--papel` x `--fundo`), entao os dois convivem no
+ * mesmo bundle sem que um apague o outro.
+ *
+ * Antes deste arquivo havia tres paletas no repositorio: o tema escuro do painel, o
+ * dark editorial da landing e o claro dos prototipos. As tres desenhavam o mesmo
+ * produto de tres jeitos.
+ *
+ * REGRA DE CONTRASTE
+ * Toda cor de texto aqui foi medida contra `--papel-3` (#eef2fb), que e a superficie
+ * mais clara onde ela pode cair — portanto o pior caso. O numero medido esta no
+ * comentario de cada uma. O minimo aceito e 4,5:1 (WCAG AA, texto normal).
+ */
+
+:root {
+  /* ---- Tinta ------------------------------------------------------------ */
+  --tinta: #0a1230; /* 16,4:1 — titulos e texto forte */
+  --tinta-suave: #475873; /*  6,4:1 — corpo de texto secundario */
+  --tinta-fraca: #5e6c87; /*  4,7:1 — rotulos e notas. Nao escurecer menos que isto:
+                                  o #74829b dos prototipos dava 3,5:1 e reprovava. */
+
+  /* ---- Superficies, da mais alta para a mais funda ---------------------- */
+  --papel: #ffffff;
+  --papel-2: #f4f7fd;
+  --papel-3: #eef2fb;
+
+  /* ---- Linhas ----------------------------------------------------------- */
+  --linha: #dce3ef;
+  --linha-forte: #c2cde0;
+
+  /* ---- Primaria --------------------------------------------------------- */
+  --azul: #2f56b8; /* 6,7:1 em branco — serve de texto de link e de fundo de botao */
+  --azul-escuro: #1e3f8f;
+  --azul-lavado: #e7eeff;
+
+  /* ---- Acento ----------------------------------------------------------- */
+  /* Reservado para o que o visitante deve olhar AGORA. Se aparecer em dois lugares
+     da mesma tela, perdeu a funcao. Sempre com `--tinta` por cima: 12,9:1. */
+  --ouro: #ffd27a;
+
+  /* ---- Sinal ------------------------------------------------------------ */
+  /* Nunca sozinhos: cor acompanha palavra, senao exclui quem nao a distingue.
+     Mesma regra que o tema do console ja seguia. */
+  --match: #1e7054; /* 5,4:1 */
+  --duvida: #8a5f0c; /* 5,0:1 */
+  --falha: #a33a3a; /* 5,8:1 */
+  --match-lavado: #dff1e8;
+  --duvida-lavado: #fdf0d8;
+
+  /* ---- Noite ------------------------------------------------------------ */
+  /* Um bloco escuro, usado de proposito como textura (o console da jornada),
+     nunca como moldura do aplicativo. */
+  --noite: #0a1230;
+  --noite-linha: #293859;
+  --noite-texto: #e3eafa;
+  --noite-texto-fraco: #a7b5d3;
+
+  /* ---- Tipografia ------------------------------------------------------- */
+  --fonte-display: Outfit, ui-sans-serif, system-ui, sans-serif;
+  --fonte-texto: Manrope, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --fonte-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* Escala. O painel inteiro vivia entre 10px e 14px, o que serve para ler um
+     numero de relance e nao para ler uma frase. A narrativa comeca em 16px. */
+  --t-hero: clamp(2.5rem, 1.2rem + 5.5vw, 5.5rem); /* 40 -> 88 */
+  --t-titulo: clamp(1.75rem, 1.1rem + 2.6vw, 2.75rem); /* 28 -> 44 */
+  --t-secao: clamp(1.375rem, 1.15rem + 1.1vw, 1.75rem); /* 22 -> 28 */
+  --t-destaque: 1.25rem; /* 20 */
+  --t-corpo-g: 1.0625rem; /* 17 */
+  --t-corpo: 1rem; /* 16 */
+  --t-apoio: 0.875rem; /* 14 */
+  --t-nota: 0.8125rem; /* 13 */
+  --t-micro: 0.75rem; /* 12 — piso. Abaixo disso nao entra nada. */
+
+  --peso-display: 300;
+  --peso-normal: 400;
+  --peso-medio: 500;
+  --peso-forte: 700;
+
+  --altura-apertada: 1.05;
+  --altura-titulo: 1.15;
+  --altura-texto: 1.65;
+
+  /* ---- Espaco ----------------------------------------------------------- */
+  /* O tema antigo tinha um `--espaco: 8px` que quase nunca era usado — 12, 24, 10 e
+     28 estavam escritos a mao por todo o CSS. Esta escala existe para ser usada. */
+  --e-1: 4px;
+  --e-2: 8px;
+  --e-3: 12px;
+  --e-4: 16px;
+  --e-5: 24px;
+  --e-6: 32px;
+  --e-7: 48px;
+  --e-8: 64px;
+  --e-9: 96px;
+  --e-10: 128px;
+
+  /* ---- Medida ----------------------------------------------------------- */
+  --largura-pagina: 1120px;
+  --largura-texto: 66ch; /* linha de leitura confortavel */
+
+  /* ---- Forma ------------------------------------------------------------ */
+  --r-1: 4px;
+  --r-2: 8px;
+  --r-3: 14px;
+  --r-circulo: 999px;
+  /* A unica marca visual propria do projeto, herdada da landing. Mantida. */
+  --r-botao: 12px 12px 12px 4px;
+
+  /* ---- Sombra ----------------------------------------------------------- */
+  --s-1: 0 1px 2px rgb(10 18 48 / 6%);
+  --s-2: 0 4px 16px rgb(10 18 48 / 7%);
+  --s-3: 0 16px 48px rgb(10 18 48 / 10%);
+
+  /* ---- Movimento -------------------------------------------------------- */
+  /* Ver a politica: movimento so onde ele carrega informacao que o texto nao
+     carrega. `--mov-cena` e o unico passo longo, e so a jornada o usa. */
+  --mov-rapido: 160ms;
+  --mov-medio: 320ms;
+  --mov-cena: 600ms;
+  --mov-curva: cubic-bezier(0.2, 0.6, 0.2, 1);
+}
+
+/*
+ * Pontos de quebra — `@media` nao le custom property, entao estes valores sao
+ * documentacao, nao token. Escritos aqui para que haja um lugar so onde conferi-los.
+ *
+ *   celular   max-width: 640px
+ *   tablet    max-width: 900px
+ *   largo     min-width: 1200px
+ *
+ * O painel antigo usava 720, 760 e 860 espalhados por seis arquivos.
+ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --mov-rapido: 0ms;
+    --mov-medio: 0ms;
+    --mov-cena: 0ms;
+  }
+}

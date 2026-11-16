@@ -322,8 +322,8 @@ O joelho da curva esta entre 10 e 50 usuarios simultaneos.
 
 ## Modo demonstracao (Fase 9)
 
-Preparado no codigo e no Terraform. **Nada foi aplicado na AWS** — a infraestrutura
-continua destruida e o custo acumulado continua em US$ 0,0001.
+Aplicado na AWS e no ar em <https://nexus.mateus-bueno.dev>, com login automatico de
+convidado. O custo medido dos primeiros dias no ar continua em US$ 0,0001.
 
 ```bash
 NEXUS_DEMO_MODE=true docker compose up -d --wait
@@ -418,11 +418,10 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
 - **Pesos e limiares de correspondencia sao parametros calibrados**, nao verdades.
 - **Nao ha operacao de desfazer fusao.** A evidencia permite localizar a aresta
   culpada, mas reverte-la e manual.
-- **O comportamento sob carga na AWS nao foi medido.** A Fase 7 mediu localmente; a
-  nuvem exige reaplicar a infraestrutura, e a conta tem cota de 10 execucoes
-  concorrentes, entao qualquer vazao medida la seria a cota e nao a arquitetura.
+- **O comportamento sob carga na AWS nao foi medido.** A Fase 7 mediu localmente. A
+  conta tem cota de 10 execucoes concorrentes, entao qualquer vazao medida la seria a
+  cota e nao a arquitetura.
 - **Cold start nao foi quantificado** — depende do item acima.
-- **Nenhum dominio proprio configurado.**
 - **Parte do historico do dashboard ainda vive na aba.** A profundidade da plataforma
   passou a vir da serie persistida na Fase 6, mas as series de taxa das telas API e
   Worker continuam acumuladas no navegador e zeram ao recarregar. O rotulo `sessao`
@@ -431,14 +430,11 @@ make generate N=1000     # gera e envia 1000 registros sinteticos
   continua em `StoredRecord` e `ProcessingResult`, que sao transacionais.
 - **A serie so avanca quando alguem observa.** Nao ha processo amostrando em laco. Com
   o painel fechado, a janela tem buracos — e a interface diz quantos.
-- **A amostragem pelo EventBridge Scheduler nao foi validada na nuvem**, que esta
-  destruida. A rota existe e e testada localmente.
-- **O dashboard nao foi publicado na Vercel**; roda local contra a API em Docker.
 - **Deduplicacao por conteudo e best-effort sob concorrencia** — o indice consultado e
   eventualmente consistente. A resolucao autoritativa de identidade e da Fase 5.
 - **Metricas sao do processo**: zeram no reinicio e nao agregam entre replicas.
-- Nenhum recurso de nuvem foi provisionado; nenhuma medicao local vale como previsao
-  de desempenho ou custo na AWS.
+- **Nenhuma medicao local vale como previsao de desempenho ou custo na AWS.** O que
+  esta provisionado la roda sob demanda; os numeros da Fase 7 sao do ambiente local.
 
 
 Lista completa, agrupada por causa e com as limitacoes ja vencidas separadas das que

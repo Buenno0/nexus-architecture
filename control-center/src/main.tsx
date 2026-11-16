@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { AuthProvider } from "./auth/provider";
+import "./styles/tokens.css";
 import "./styles/theme.css";
 
 const cliente = new QueryClient({

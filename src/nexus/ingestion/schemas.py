@@ -315,6 +315,31 @@ class DemoSeedOut(BaseModel):
     record_ids: list[str] = Field(default_factory=list)
 
 
+class DemoAdvanceOut(BaseModel):
+    """Resultado de um passo de processamento pedido pelo visitante.
+
+    Mesma filosofia de ``DemoSeedRequest``: o visitante escolhe **quando**, nunca
+    **quanto**. Por isso esta rota nao tem corpo de pedido — os limites sao fixos no
+    servidor.
+
+    ``outbox_pending`` e ``queue_pending`` sao o que sobrou depois do passo. Existem
+    para a interface poder dizer "ainda falta, peca de novo" em vez de deixar o
+    visitante achando que o trabalho acabou.
+    """
+
+    dispatched: int
+    received: int
+    processed: int
+    skipped_duplicate: int
+    dead_lettered: int
+    duration_ms: float
+    outbox_pending: int
+    queue_pending: int
+    #: Quantas rodadas de consumo o passo levou. Chegar ao teto significa que havia
+    #: mais fila do que um passo leva — nao que algo falhou.
+    batches: int
+
+
 # -------------------------------------------------------------------- observability
 
 
