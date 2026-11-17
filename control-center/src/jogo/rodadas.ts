@@ -54,9 +54,16 @@ async function associados(): Promise<Rodada[]> {
   // isso numa chamada so.
   const pagina = await request<RecordPage>("/v1/records?limit=60");
   const amostra = embaralhar(pagina.items).slice(0, 24);
-  const detalhes = await Promise.allSettled(
-    amostra.map((r) => request<RecordDetail>(`/v1/records/${encodeURIComponent(r.record_id)}`)),
-  );
+  // Em blocos de 6: 24 chamadas de uma vez estouram a concorrencia das Lambdas na
+  // demonstracao e voltam 503.
+  const detalhes: PromiseSettledResult<RecordDetail>[] = [];
+  for (let k = 0; k < amostra.length; k += 6) {
+    detalhes.push(
+      ...(await Promise.allSettled(
+        amostra.slice(k, k + 6).map((r) => request<RecordDetail>(`/v1/records/${encodeURIComponent(r.record_id)}`)),
+      )),
+    );
+  }
   const entidades = embaralhar([
     ...new Set(
       detalhes.flatMap((d) => (d.status === "fulfilled" && d.value.entity_id ? [d.value.entity_id] : [])),
