@@ -1263,3 +1263,13 @@
     gap: var(--e-5);
   }
 }
+
+/* Porta para o jogo: o unico destaque do cabecalho. */
+.narrativa .cabecalho__links .cabecalho__jogar {
+  padding: var(--e-2) var(--e-4);
+  border-radius: var(--r-botao);
+  background: var(--azul);
+  color: var(--papel);
+  font-weight: var(--peso-forte);
+  text-decoration: none;
+}

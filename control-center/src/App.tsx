@@ -16,6 +16,7 @@ import { Decisoes, Experimentos, Infraestrutura } from "./screens/EngineeringLab
 import { AlertBanner } from "./components/AlertBanner";
 import { useAlerts, useHealth } from "./api/queries";
 import { Narrativa } from "./narrativa/Narrativa";
+import { Jogo } from "./jogo/Jogo";
 
 const TELAS = [
   { id: "arquitetura", rotulo: "Arquitetura", componente: Arquitetura },
@@ -56,8 +57,10 @@ export function App() {
   const [tela, setTela] = useState<TelaId | null>(
     () => telaDaUrl() ?? (config.demoMode ? null : "overview"),
   );
+  // O jogo nao e aba do console: e uma porta da pagina publica, com endereco proprio.
+  const [jogando, setJogando] = useState(() => window.location.hash === "#jogar");
   useEffect(() => {
-    const atualizar = () => { setTela(telaDaUrl()); };
+    const atualizar = () => { setTela(telaDaUrl()); setJogando(window.location.hash === "#jogar"); };
     window.addEventListener("hashchange", atualizar);
     return () => window.removeEventListener("hashchange", atualizar);
   }, []);
@@ -74,6 +77,10 @@ export function App() {
   // frente de uma casa aberta. Se a tentativa falhar, `autenticandoConvidado` vira
   // false e o formulario aparece com o erro.
   if (!autenticado) return autenticandoConvidado ? <Abrindo /> : <Login />;
+
+  if (jogando) {
+    return <Jogo sair={() => { window.location.hash = ""; }} />;
+  }
 
   if (tela === null) {
     return <Narrativa abrirConsole={() => { window.location.hash = "overview"; }} />;

@@ -30,6 +30,7 @@ export function Narrativa({ abrirConsole }: { abrirConsole: () => void }) {
           <span className="cabecalho__linha">Engenharia de sistemas distribuídos</span>
         </div>
         <nav className="cabecalho__links" aria-label="Links do projeto">
+          <a className="cabecalho__jogar" href="#jogar">Jogar: mesma pessoa?</a>
           <a href={REPO}>Repositório</a>
           <button type="button" className="elo" onClick={abrirConsole}>
             Painel técnico
