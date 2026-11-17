@@ -68,19 +68,20 @@ export function AuthProvider({
 
   const modo = modoForcado ?? config.authMode;
 
-  useEffect(() => {
-    if (modo === "none") {
-      setTokenProvider(async () => null);
-      return;
-    }
-    setTokenProvider(async () => {
-      if (!sessao) return null;
-      // Token vencido e pior que token ausente: produz 401 confuso em vez de um
-      // pedido de login claro.
-      if (Date.now() >= sessao.expiraEm) return null;
-      return sessao.idToken;
-    });
-  }, [modo, sessao]);
+  // Registrado na renderizacao, nao num efeito: efeitos dos filhos rodam ANTES dos
+  // do provider, entao uma tela que consulta ao montar (o jogo) saia sem token e
+  // levava 401. Registrar aqui e idempotente e ja vale para o primeiro filho.
+  setTokenProvider(
+    modo === "none"
+      ? async () => null
+      : async () => {
+          if (!sessao) return null;
+          // Token vencido e pior que token ausente: produz 401 confuso em vez de um
+          // pedido de login claro.
+          if (Date.now() >= sessao.expiraEm) return null;
+          return sessao.idToken;
+        },
+  );
 
   const entrar = useCallback(async (usuario: string, senha: string) => {
     setEntrando(true);
