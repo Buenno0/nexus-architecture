@@ -40,9 +40,14 @@ export function Pergunta() {
       </h1>
 
       <p className="pergunta__lead">
-        Toda empresa que recebe dados de mais de um lugar acaba com esta pergunta na
-        mesa. O Nexus é um sistema que a responde — e que mostra por que respondeu.
+        O Nexus decide quando dois cadastros vindos de fontes diferentes descrevem a
+        mesma pessoa — e mostra por quê. Você consegue decidir melhor que ele?
       </p>
+
+      <div className="pergunta__acoes">
+        <a className="pergunta__jogar" href="#jogar">Jogar com pares reais</a>
+        <a className="pergunta__ver" href="#arquitetura">Ver o sistema por dentro</a>
+      </div>
 
       <div className="par" role="group" aria-label="Dois registros vindos de fontes diferentes">
         {PAR.map((registro) => (
@@ -61,19 +66,6 @@ export function Pergunta() {
             </dl>
           </article>
         ))}
-      </div>
-
-      <p className="par__nota">
-        Exemplo ilustrativo. O e-mail destacado é idêntico nos dois; o nome não.
-      </p>
-
-      <div className="pergunta__consequencia">
-        <p>
-          <strong>Errar para os dois lados custa caro.</strong> Tratar os dois como
-          pessoas diferentes duplica o cadastro, e a mesma pessoa passa a receber tudo
-          em dobro. Juntá-los sem cuidado mistura duas pessoas num registro só — e aí o
-          erro vai junto para todo lugar que consome esse dado.
-        </p>
       </div>
     </section>
   );

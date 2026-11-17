@@ -23,8 +23,7 @@ export function Decisoes() {
         Como o sistema é montado, e o que cada escolha custou
       </h2>
       <p className="lead">
-        Três decisões sustentam o que você acabou de ver acontecer. Nenhuma delas é de
-        graça.
+        Três escolhas sustentam o sistema. Nenhuma é de graça.
       </p>
 
       <Mapa />
@@ -96,15 +95,6 @@ export function Decisoes() {
               conteúdo devolve a resposta anterior; com conteúdo diferente, responde
               conflito.
             </p>
-            <p>
-              São <strong>três conceitos de identidade separados de propósito</strong>: a
-              chave diz que é a mesma operação, a impressão do conteúdo diz que é o mesmo
-              dado, e a resolução de identidade diz que é a mesma pessoa. Derivar a
-              primeira da chave natural pareceria economia — mas aí a mesma pessoa
-              chegando com o telefone atualizado produziria a mesma chave, e a
-              atualização seria descartada em silêncio. Isso não é deduplicação, é perda
-              de dado.
-            </p>
             <a className="decisao__fonte" href={`${ADR}ADR-002-identidade-e-idempotencia.md`}>
               Ler a decisão sobre identidade e idempotência
             </a>
@@ -121,11 +111,6 @@ export function Decisoes() {
               A comparação pesa cada campo disponível. Acima do limiar, associa; abaixo,
               descarta. No meio existe uma terceira resposta: o par vira um item de
               revisão humana e <strong>nunca é fundido automaticamente</strong>.
-            </p>
-            <p>
-              Os pesos e limiares são parâmetros calibrados, não verdades. A avaliação
-              usa dados sintéticos com gabarito conhecido — ela permite investigar erros
-              nesse conjunto, não prever desempenho com dados reais.
             </p>
             <a className="decisao__fonte" href={`${ADR}ADR-006-entity-resolution.md`}>
               Ler a decisão sobre resolução de identidade

@@ -108,8 +108,7 @@ export function Medicoes() {
         O que eu medi — e onde errei
       </h2>
       <p className="lead">
-        Nenhum número aqui veio de uma corrida só, e nenhum foi medido na AWS. As duas
-        frases custaram quatro erros para serem escritas.
+        Medido localmente, sempre com corridas repetidas.
       </p>
 
       <div className="medidas">
@@ -134,8 +133,7 @@ export function Medicoes() {
 
       <h3 className="medicoes__subtitulo">Os quatro erros</h3>
       <p className="medicoes__intro">
-        Não são defeitos do código. São erros meus de método, e continuam versionados
-        junto dos relatórios — inclusive as corridas inconclusivas.
+        Erros meus de método. Continuam versionados junto dos relatórios.
       </p>
 
       <ol className="erros">
@@ -155,23 +153,11 @@ export function Medicoes() {
       </ol>
 
       <blockquote className="licao">
-        <p>
-          O padrão comum aos quatro: eu olhei um número, formei uma explicação plausível e
-          a publiquei. A explicação plausível foi errada todas as vezes.
-        </p>
         <p className="licao__antidoto">
-          O único antídoto que funcionou foi repetir a medição e olhar a dispersão antes
-          de olhar a diferença.
+          A lição: repetir a medição e olhar a dispersão antes de olhar a diferença.
         </p>
       </blockquote>
 
-      <p className="medicoes__rodape">
-        A disciplina vale também para o que ainda não sei: o cold start das funções foi
-        medido depois do deploy — 1.416 ms na API, 732 ms no dispatcher, 573 ms no worker
-        —, mas é <strong>uma observação por função</strong>. Pela lição acima, isso não é
-        uma medição, e está escrito assim no relatório.{" "}
-        <a href={`${REPO}docs/testing/phase-9-report.md`}>Ver a verificação do deploy</a>
-      </p>
     </section>
   );
 }

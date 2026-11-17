@@ -1273,3 +1273,23 @@
   font-weight: var(--peso-forte);
   text-decoration: none;
 }
+
+/* ---- Abertura: os dois caminhos ---------------------------------------- */
+
+.narrativa .pergunta__acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--e-3);
+  margin: var(--e-5) 0 var(--e-6);
+}
+.narrativa .pergunta__jogar,
+.narrativa .pergunta__ver {
+  padding: var(--e-3) var(--e-5);
+  border-radius: var(--r-botao);
+  font-weight: var(--peso-forte);
+  text-decoration: none;
+}
+.narrativa .pergunta__jogar { background: var(--azul); color: var(--papel); }
+.narrativa .pergunta__jogar:hover { background: var(--azul-escuro); }
+.narrativa .pergunta__ver { border: 1px solid var(--linha-forte); color: var(--tinta); }
+.narrativa .pergunta__ver:hover { background: var(--papel-2); }

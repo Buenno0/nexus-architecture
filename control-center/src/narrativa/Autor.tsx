@@ -24,24 +24,12 @@ export function Autor() {
       <div className="autor">
         <div className="autor__texto">
           <p>
-            Construí o Nexus para investigar uma pergunta inteira, do começo ao fim: como
-            receber registros de fontes diferentes, decidir quais descrevem a mesma
-            pessoa, e deixar essa decisão auditável. O projeto reúne a implementação, a
-            infraestrutura, a interface e a documentação — porque nenhuma das quatro
-            responde sozinha.
-          </p>
-          <p>
-            Python com FastAPI e Pydantic, rodando em Lambda com Mangum. DynamoDB em
-            tabela única com quatro índices, SQS com fila de falhas, Cognito e API
-            Gateway, tudo em Terraform. O painel é React com TypeScript. A suíte roda
-            inteira no CI, testes de integração incluídos, contra um DynamoDB local que
-            sobe pelo mesmo compose do desenvolvimento.
+            Construí o Nexus sozinho, de ponta a ponta: backend, infraestrutura,
+            interface, testes e medição.
           </p>
           <p className="autor__tese">
-            A regra que governa o repositório: <strong>nenhuma capacidade não
-            implementada é declarada em lugar nenhum</strong>. Quando um número não
-            existe, está escrito que não existe. Quando uma conclusão estava errada, ela
-            continua lá, marcada como errada.
+            Python · FastAPI · AWS Lambda · DynamoDB · SQS · Terraform · React ·
+            TypeScript
           </p>
         </div>
 

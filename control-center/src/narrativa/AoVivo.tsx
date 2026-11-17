@@ -93,8 +93,7 @@ export function AoVivo({ abrirConsole }: { abrirConsole: () => void }) {
         O que a plataforma acumulou até aqui
       </h2>
       <p className="lead">
-        Tudo abaixo vem do armazenamento, não de contadores em memória: sobrevive a
-        reinício e não zera quando você recarrega esta página.
+        Contadores gravados no banco, não em memória.
       </p>
 
       {erro ? (
@@ -111,9 +110,7 @@ export function AoVivo({ abrirConsole }: { abrirConsole: () => void }) {
       )}
 
       <p className="aovivo__saida">
-        Estes são os números que cabem numa frase. O painel de operador tem o resto —
-        latência por rota, profundidade da fila ao longo do tempo, a fila de revisão com
-        a evidência de cada par, os relatórios de carga e os onze registros de decisão.{" "}
+        Latência, fila, revisões e os onze ADRs estão no painel.{" "}
         <button type="button" className="elo" onClick={abrirConsole}>
           Abrir o painel técnico
         </button>
@@ -143,8 +140,7 @@ function Placar({ numeros }: { numeros: Numeros }) {
   if (itens.length === 0) {
     return (
       <p className="legenda">
-        A plataforma respondeu, mas ainda não há nada acumulado. Envie um lote na seção
-        acima.
+        Ainda não há nada acumulado.
       </p>
     );
   }
@@ -162,8 +158,7 @@ function Placar({ numeros }: { numeros: Numeros }) {
       <p className="placar__origem">
         Consultado às{" "}
         {numeros.em.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })},
-        uma vez. Origem: <strong>persistido</strong> — vem do armazenamento, não da
-        memória do processo que respondeu.
+        uma vez.
         {fila.dead > 0 ? (
           <>
             {" "}
