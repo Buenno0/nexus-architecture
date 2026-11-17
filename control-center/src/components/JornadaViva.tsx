@@ -1,102 +1,323 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+/**
+ * A aba Arquitetura: o sistema desenhado como diagrama, alimentado pelo lote real.
+ *
+ * NAO E UMA LANDING PAGE
+ *
+ * A versao anterior abria com titulo de duas linhas e cartao claro com botao azul —
+ * o molde de qualquer produto. Quem chega aqui ja esta no console: o que interessa e
+ * ver o mecanismo. Cada caixa mostra o dado que aquela etapa produz de verdade (o
+ * status da API, as duas linhas da transacao, a espera na fila, os campos comparados).
+ *
+ * O MESMO FLUXO DA NARRATIVA
+ *
+ * Enviar e processar vem de `useJornada`, o mesmo estado da pagina publica. Assim o
+ * worker tem a evidencia campo a campo para mostrar, e as duas telas nao divergem.
+ *
+ * O RITMO E DA ANIMACAO, A ORDEM E DO SISTEMA
+ *
+ * A trilha chega inteira depois de "Processar": acender tudo de uma vez nao mostraria
+ * percurso nenhum. Os eventos sao revelados um a um, na ordem em que a plataforma os
+ * registrou, e o intervalo real de cada um aparece escrito em ms. A legenda diz isso.
+ */
+
+import { useEffect, useState } from "react";
+
 import { config } from "../api/config";
-import { request } from "../api/client";
-import { ingerir, semear } from "../api/queries";
-import { montarLote } from "../api/generator";
-import type { RecordDetail, Trail, TrailEvent } from "../api/types";
+import type { Evidence, TrailEvent } from "../api/types";
+import { TAMANHO_DO_LOTE, useJornada } from "../narrativa/useJornada";
+import {
+  IconeApi,
+  IconeArmazenamento,
+  IconeFila,
+  IconeWorker,
+  type EstadoIcone,
+} from "./IconesEtapa";
 import "./JornadaViva.css";
 
-const fontes = "https://github.com/Buenno0/nexus-architecture/blob/main/";
-const etapas = [
-  { stage: "accepted", nome: "API", subtitulo: "recebe", x: 130 },
-  { stage: "accepted", nome: "Armazenamento", subtitulo: "guarda", x: 320 },
-  { stage: "published", nome: "Fila", subtitulo: "aguarda", x: 510 },
-  { stage: "consumed", nome: "Worker", subtitulo: "processa", x: 700 },
-] as const;
-const descricoes: Record<TrailEvent["stage"], string> = {
-  accepted: "A API recebeu o registro e o guardou junto de um evento para processamento.",
-  published: "Uma mensagem foi publicada na fila. O registro permanece guardado.",
-  consumed: "O worker recebeu a mensagem e iniciou o processamento.",
-  resolved: "O processamento terminou. Confira abaixo o que a trilha registrou sobre a comparação.",
-  failed: "Uma falha foi registrada durante o processamento; uma nova tentativa pode acontecer.",
-  dead_lettered: "A mensagem foi encaminhada para a fila de falhas.",
-};
-const nomeEvento: Record<TrailEvent["stage"], string> = {
-  accepted: "ACCEPTED", published: "PUBLISHED", consumed: "CONSUMED",
-  resolved: "RESOLVED", failed: "FAILED", dead_lettered: "DEAD_LETTERED",
+type Stage = TrailEvent["stage"];
+
+/** Ordem em que os marcos aparecem; `failed` e `dead_lettered` saem do caminho feliz. */
+const ORDEM: Stage[] = ["accepted", "published", "consumed", "resolved"];
+const PASSO_MS = 650;
+
+const ROTULOS: Record<string, string> = {
+  full_name: "nome",
+  legal_name: "razão social",
+  email: "e-mail",
+  phone: "telefone",
+  document: "documento",
 };
 
-function valor(dados: Record<string, unknown> | undefined, chave: string) {
-  const v = dados?.[chave];
-  return typeof v === "string" && v.trim() ? v : null;
+const DECISAO: Record<Evidence["decision"], string> = {
+  MATCH: "MATCH — associa",
+  POSSIBLE_MATCH: "POSSIBLE_MATCH — vai para revisão",
+  NO_MATCH: "NO_MATCH — mantém separados",
+};
+
+function curto(id: string | undefined): string {
+  return id ? `${id.slice(0, 10)}…` : "—";
+}
+
+function ms(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined) return "";
+  return valor >= 1000 ? `${(valor / 1000).toFixed(1)} s` : `${valor} ms`;
+}
+
+/** Quantos marcos ja foram revelados na tela. Sobe um por vez ate alcancar a trilha. */
+function useRevelados(total: number, chave: string): number {
+  const reduzido =
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const [vistos, setVistos] = useState(0);
+
+  useEffect(() => { setVistos(0); }, [chave]);
+  useEffect(() => {
+    if (reduzido) { setVistos(total); return; }
+    if (vistos >= total) return;
+    const t = window.setTimeout(() => setVistos((v) => v + 1), vistos === 0 ? 120 : PASSO_MS);
+    return () => window.clearTimeout(t);
+  }, [vistos, total, reduzido]);
+
+  return Math.min(vistos, total);
 }
 
 export function JornadaViva() {
-  const [id, setId] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState("");
-  const [duplicado, setDuplicado] = useState(false);
-  const [resposta, setResposta] = useState("");
-  const trilha = useQuery({
-    queryKey: ["jornada-viva", id],
-    queryFn: () => request<Trail>(`/v1/observability/trail/${encodeURIComponent(id)}`),
-    enabled: id.length > 0,
-    refetchInterval: (query) => query.state.data?.events.some((e) => e.stage === "resolved" || e.stage === "dead_lettered") ? false : config.pollIntervalMs,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: false,
-  });
-  const registro = useQuery({
-    queryKey: ["jornada-registro", id],
-    queryFn: () => request<RecordDetail>(`/v1/records/${encodeURIComponent(id)}`),
-    enabled: id.length > 0,
-  });
-  const eventos = trilha.data?.events ?? [];
-  const tem = (stage: TrailEvent["stage"]) => eventos.some((e) => e.stage === stage);
-  const ultimo = eventos.at(-1);
-  const resolvido = [...eventos].reverse().find((e) => e.stage === "resolved");
-  const candidatos = resolvido?.detail.candidates;
-  const matches = resolvido?.detail.matches;
-  const mensagem = !id ? "Envie um exemplo para acompanhar o que acontece com ele." : trilha.isError ? "Não foi possível consultar a trilha. Tente atualizar." : trilha.isPending ? "Consultando os primeiros eventos…" : ultimo ? descricoes[ultimo.stage] : "Nenhum evento foi encontrado ainda. A trilha pode ter lacunas.";
-  const nome = valor(registro.data?.payload, "full_name");
-  const email = valor(registro.data?.payload, "email");
+  const j = useJornada();
+  const primeiro = j.ids[0];
+  const eventos = (j.trilha?.events ?? []).filter((e) => ORDEM.includes(e.stage));
+  const vistos = useRevelados(eventos.length, primeiro ?? "");
+  const revelados = eventos.slice(0, vistos);
+  const evento = (s: Stage) => revelados.find((e) => e.stage === s);
+  const teve = (s: Stage) => Boolean(evento(s));
 
-  async function enviar() {
-    setEnviando(true); setErro(""); setId(""); setResposta(""); setDuplicado(false);
-    try {
-      if (config.demoMode) {
-        const resultado = await semear(1);
-        const recordId = resultado.record_ids?.[0];
-        if (!recordId) throw new Error("O pedido foi concluído, mas a API não devolveu um identificador. Acompanhar a jornada exige a versão atualizada da API.");
-        setDuplicado(resultado.duplicate > 0);
-        setResposta(`POST /v1/demo/seed · resposta recebida · aceitos: ${resultado.accepted} · duplicados: ${resultado.duplicate} · falhas: ${resultado.failed}`);
-        setId(recordId);
-      } else {
-        const exemplo = montarLote(1, "jornada-visual", 0, 0)[0];
-        if (!exemplo) throw new Error("Não foi possível criar um exemplo sintético.");
-        const resultado = await ingerir("person", exemplo.payload);
-        setDuplicado(resultado.status === "duplicate");
-        setResposta(`POST /v1/records/person · resposta recebida · ${resultado.status}`);
-        setId(resultado.record_id);
-      }
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Não foi possível enviar. Tente novamente.");
-    } finally { setEnviando(false); }
-  }
+  const ocupado = j.fase === "enviando" || j.fase === "processando";
+  const proximo = ORDEM.find((s) => !teve(s));
+  /** Uma etapa "age" enquanto a plataforma trabalha nela; "feito" quando o marco chegou. */
+  const estado = (concluida: boolean, agindo: boolean): EstadoIcone =>
+    concluida ? "feito" : agindo ? "agindo" : "parado";
 
-  return <div className="jornada-real">
-    <header className="jornada-real__hero"><div><span>PROJETO DE ENGENHARIA</span><h1>Dados diferentes.<br />Uma mesma pessoa?</h1></div><p>O Nexus recebe registros de fontes diferentes e procura relações entre eles. Um projeto pessoal de Mateus Bueno sobre processamento assíncrono e resolução de identidade.</p></header>
-    <section className="jornada-real__problema"><div><span>O PROBLEMA</span><h2>O mesmo cadastro pode chegar de formas diferentes.</h2></div><div><p>Uma pessoa pode aparecer em duas fontes com nomes escritos de maneiras diferentes. Tratar tudo como novo cria duplicatas; juntar registros sem cuidado pode misturar pessoas distintas.</p><p>Envie um registro sintético para acompanhar o que o Nexus faz com ele.</p></div></section>
-    <section className="jornada-real__cena" aria-label="Caminho de um registro real"><header><strong>Acompanhe um registro</strong><span>Dados sintéticos · eventos da plataforma</span></header><div className="jornada-real__controles"><button type="button" onClick={() => void enviar()} disabled={enviando}>{enviando ? "Enviando…" : id ? "Enviar outro exemplo" : "Enviar exemplo"}</button>{id && <button className="jornada-real__atualizar" type="button" onClick={() => { void trilha.refetch(); void registro.refetch(); }}>Atualizar</button>}<small>Cria um registro fictício na plataforma.</small></div>
-      <div className="jornada-real__entrada"><span>REGISTRO</span>{!id ? "O exemplo aparecerá aqui depois do envio." : registro.isPending ? "Consultando o registro…" : registro.isError ? "Não foi possível consultar os dados do registro." : <>{nome ?? "Nome indisponível"}{email && <> · {email}</>}</>}</div>
-      <div className="jornada-real__desenho"><svg viewBox="0 0 860 230" role="img" aria-label="Diagrama da API, armazenamento, fila e worker. Os destaques representam eventos encontrados na trilha deste registro."><path className="jornada-real__linha" d="M60 85H130 M222 85H320 M412 85H510 M602 85H700" />{etapas.map((etapa) => <g key={etapa.nome} className={tem(etapa.stage) ? "jornada-real__observado" : ""}><rect x={etapa.x} y="43" width="92" height="84" rx="12"/><text x={etapa.x + 46} y="77" textAnchor="middle" className="jornada-real__marca">{etapa.nome === "Armazenamento" ? "▤" : etapa.nome === "Fila" ? "≡" : etapa.nome === "Worker" ? "◷" : "↘"}</text><text x={etapa.x + 46} y="151" textAnchor="middle" className="jornada-real__nome">{etapa.nome}</text><text x={etapa.x + 46} y="169" textAnchor="middle" className="jornada-real__sub">{tem(etapa.stage) ? "observado" : etapa.subtitulo}</text></g>)}{tem("accepted") && <g key={id} className="jornada-real__registro-movel" aria-hidden="true"><rect x="-35" y="-11" width="70" height="22" rx="5"/><text x="0" y="4" textAnchor="middle">registro</text></g>}{tem("published") && <g className="jornada-real__pacote" style={{ transform: `translate(${tem("consumed") ? 746 : 556}px, 105px)` }}><rect x="-38" y="-11" width="76" height="22" rx="5"/><text x="0" y="4" textAnchor="middle">mensagem</text></g>}</svg></div>
-      <div className="jornada-real__legenda" aria-live="polite">{mensagem}</div>
-      {erro && <p className="jornada-real__aviso" role="alert">{erro}</p>}{duplicado && <p className="jornada-real__aviso">Este exemplo já existia. A trilha mostrada pertence ao registro original.</p>}{id && <p className="jornada-real__nota">ID: <code>{id}</code>. A consulta é atualizada a cada {Math.round(config.pollIntervalMs / 1000)} segundos enquanto o processamento não termina. O movimento ilustra eventos observados; não representa o tempo exato entre eles. A trilha é best-effort: um marco ausente não comprova falha.</p>}
+  const apiFeita = teve("accepted");
+  const publicado = teve("published");
+  const consumido = teve("consumed");
+  const resolvido = evento("resolved");
+  const espera = evento("consumed")?.delta_ms;
+  const evidencia = resolvido ? j.par?.evidencia : undefined;
+
+  const rota = config.demoMode ? "POST /v1/demo/seed" : "POST /v1/records/person";
+  const legenda = legendaDe(j.fase, proximo, Boolean(resolvido), j.precisaDeOutroPasso);
+
+  return (
+    <section className="diag" aria-labelledby="diag-titulo">
+      <header className="diag__topo">
+        <div>
+          <p className="diag__rotulo">Arquitetura · execução real</p>
+          <h1 className="diag__titulo" id="diag-titulo">
+            Um lote atravessando o Nexus
+          </h1>
+          <p className="diag__texto">
+            {TAMANHO_DO_LOTE} registros sintéticos entram pela API, esperam na fila e são
+            comparados pelo worker. Cada caixa mostra o que aquela etapa gravou — o desenho
+            acompanha o primeiro registro do lote.
+          </p>
+        </div>
+        <div className="diag__acoes">
+          <button type="button" className="diag__botao" onClick={j.enviar} disabled={ocupado}>
+            {j.fase === "enviando" ? "Enviando…" : j.ids.length ? "Enviar outro lote" : `Enviar ${TAMANHO_DO_LOTE} registros`}
+          </button>
+          <button
+            type="button"
+            className="diag__botao diag__botao--sec"
+            onClick={j.processar}
+            disabled={ocupado || j.ids.length === 0}
+          >
+            {j.fase === "processando" ? "Processando…" : "Processar agora"}
+          </button>
+        </div>
+      </header>
+
+      <ol className="diag__fluxo">
+        <li className={`no ${apiFeita ? "no--feito" : j.fase === "enviando" ? "no--agindo" : ""}`}>
+          <div className="no__cabeca">
+            <IconeApi estado={estado(apiFeita, j.fase === "enviando")} />
+            <div>
+              <p className="no__nome">API</p>
+              <p className="no__tipo">Lambda · FastAPI</p>
+            </div>
+          </div>
+          <dl className="no__dados">
+            <div><dt>rota</dt><dd>{rota}</dd></div>
+            <div><dt>resposta</dt><dd>{apiFeita ? `202 · ${j.ids.length} aceitos` : "—"}</dd></div>
+            <div><dt>registro</dt><dd>{curto(primeiro)}</dd></div>
+          </dl>
+          <p className="no__faz">valida, grava e responde — não processa</p>
+        </li>
+
+        <Conector ativo={apiFeita} rotulo="mesma requisição" />
+
+        <li className={`no ${apiFeita ? "no--feito" : ""}`}>
+          <div className="no__cabeca">
+            <IconeArmazenamento estado={estado(apiFeita, false)} />
+            <div>
+              <p className="no__nome">Armazenamento</p>
+              <p className="no__tipo">DynamoDB · tabela única</p>
+            </div>
+          </div>
+          <div className="tx">
+            <p className="tx__rotulo">uma transação</p>
+            <p className={`tx__linha ${apiFeita ? "tx__linha--on" : ""}`}>
+              <span>OBS#{curto(primeiro)}</span>
+              <em>{apiFeita ? "gravado" : "—"}</em>
+            </p>
+            <p className={`tx__linha ${apiFeita ? "tx__linha--on" : ""} ${publicado ? "tx__linha--saiu" : ""}`}>
+              <span>OUTBOX#{curto(primeiro)}</span>
+              <em>{publicado ? "publicado" : apiFeita ? "pendente" : "—"}</em>
+            </p>
+          </div>
+          <p className="no__faz">registro e evento, os dois ou nenhum</p>
+        </li>
+
+        <Conector ativo={publicado} rotulo={publicado ? `dispatcher · ${ms(evento("published")?.delta_ms)}` : "dispatcher"} />
+
+        <li className={`no ${consumido ? "no--feito" : publicado ? "no--esperando" : ""}`}>
+          <div className="no__cabeca">
+            <IconeFila estado={estado(consumido, publicado && !consumido)} />
+            <div>
+              <p className="no__nome">Fila</p>
+              <p className="no__tipo">SQS · com DLQ</p>
+            </div>
+          </div>
+          <div className="pilha" aria-label="Mensagem deste registro na fila">
+            <span className={`pilha__msg ${publicado ? "pilha__msg--entrou" : ""} ${consumido ? "pilha__msg--saiu" : ""}`}>
+              msg {curto(primeiro)}
+            </span>
+          </div>
+          <dl className="no__dados">
+            <div><dt>estado</dt><dd>{consumido ? "consumida" : publicado ? "esperando" : "—"}</dd></div>
+            <div><dt>espera</dt><dd>{consumido && espera !== null ? ms(espera) : publicado ? "até alguém pedir" : "—"}</dd></div>
+          </dl>
+          <p className="no__faz">sem worker residente: só anda quando alguém pede</p>
+        </li>
+
+        <Conector ativo={consumido} rotulo="processamento sob demanda" />
+
+        <li className={`no no--largo ${resolvido ? "no--feito" : consumido ? "no--agindo" : ""}`}>
+          <div className="no__cabeca">
+            <IconeWorker estado={estado(Boolean(resolvido), consumido && !resolvido)} />
+            <div>
+              <p className="no__nome">Worker</p>
+              <p className="no__tipo">Lambda · resolução de identidade</p>
+            </div>
+          </div>
+          <Comparacao
+            resolvido={resolvido}
+            evidencia={evidencia}
+            par={j.par ? [nomeDe(j.par.registroA.payload), nomeDe(j.par.registroB.payload)] : null}
+          />
+          <p className="no__faz">compara campos com peso; em dúvida, não funde</p>
+        </li>
+      </ol>
+
+      <p className="diag__legenda" aria-live="polite">{legenda}</p>
+      {j.erro && <p className="diag__erro" role="alert">{j.erro}</p>}
+
+      <div className="diag__log" aria-label="Eventos da trilha">
+        <p className="diag__log-titulo">
+          trilha · {primeiro ?? "nenhum registro"}
+        </p>
+        {revelados.length === 0 ? (
+          <p className="diag__log-vazio">Os eventos aparecem aqui conforme a plataforma os registra.</p>
+        ) : (
+          revelados.map((e, i) => (
+            <p className="diag__log-linha" key={`${e.stage}-${i}`}>
+              <span className="diag__log-hora">{new Date(e.occurred_at).toLocaleTimeString("pt-BR")}</span>
+              <span className={`diag__log-stage diag__log-stage--${e.stage}`}>{e.stage}</span>
+              <span>{e.service}</span>
+              <span className="diag__log-delta">{e.delta_ms !== null ? `+${ms(e.delta_ms)}` : ""}</span>
+            </p>
+          ))
+        )}
+        <p className="diag__log-nota">
+          A ordem é a registrada pela plataforma; o ritmo da animação, não. Os intervalos
+          reais estão em ms. A trilha é best-effort: um marco ausente não prova falha.
+        </p>
+      </div>
     </section>
-    <section className="jornada-real__resultado" aria-labelledby="resultado-jornada"><h2 id="resultado-jornada">Resultado da comparação</h2>{!id ? <p>O resultado deste exemplo aparecerá aqui quando o processamento for registrado.</p> : !resolvido ? <p>Ainda não há um resultado de processamento na trilha. Ele pode estar pendente ou o evento pode não ter sido registrado.</p> : <><p>{typeof candidatos === "number" ? `${candidatos} candidato(s) comparado(s).` : "A quantidade de candidatos não está disponível nesta trilha."} {typeof matches === "number" ? `${matches} correspondência(s) registrada(s).` : "O número de correspondências não está disponível nesta trilha."}</p><p>Os campos comparados e a decisão completa não estão disponíveis neste evento. A conclusão do processamento, por si só, não significa que houve uma correspondência.</p></>}</section>
-    <section className="jornada-real__console" aria-label="Console da jornada"><header><strong>Console da jornada</strong><span>Resposta do envio e eventos persistidos · sem logs do servidor</span></header><div className="jornada-real__log">{!id ? <p>Envie um exemplo para acompanhar os eventos.</p> : <><p><span>ENVIO</span> {resposta}</p><p><span>REGISTRO</span> {id}</p>{eventos.map((evento, i) => <p key={`${evento.occurred_at}-${evento.stage}-${i}`}><span>{nomeEvento[evento.stage] ?? evento.stage}</span> {new Date(evento.occurred_at).toLocaleString("pt-BR")} · {evento.service}{evento.delta_ms !== null ? ` · intervalo ${evento.delta_ms} ms` : ""}</p>)}{trilha.isError && <p>Não foi possível consultar os eventos. Use Atualizar para tentar novamente.</p>}{!trilha.isPending && !trilha.isError && eventos.length === 0 && <p>Nenhum evento retornado até o momento.</p>}</>}</div></section>
-    <section className="jornada-real__secao"><span>POR TRÁS DA CENA</span><h2>Decisões de engenharia</h2><p>O problema, a escolha e suas consequências estão registrados junto ao código.</p><div className="jornada-real__decisoes"><details><summary>Por que guardar antes de processar?</summary><p>O registro e o evento são gravados na mesma transação. Se a publicação falhar, o evento pode ser recuperado; o consumidor precisa suportar entregas repetidas.</p><a href={`${fontes}docs/adr/ADR-003-transactional-outbox.md`}>Ler a decisão sobre transactional outbox ↗</a></details><details><summary>E se uma requisição for repetida?</summary><p>A chave de idempotência identifica a operação. Repetir a mesma chave com o mesmo conteúdo devolve a resposta anterior; conteúdo diferente gera conflito.</p><a href={`${fontes}docs/adr/ADR-002-identidade-e-idempotencia.md`}>Ler a decisão sobre idempotência ↗</a></details><details><summary>Como uma associação é decidida?</summary><p>Os campos disponíveis são comparados. Uma faixa intermediária gera revisão; os pesos e limiares não garantem acerto em dados reais.</p><a href={`${fontes}docs/adr/ADR-006-entity-resolution.md`}>Ler a decisão sobre resolução de identidade ↗</a></details></div></section>
-    <section className="jornada-real__secao"><span>PARA INVESTIGAR</span><h2>Evidências e limites</h2><div className="jornada-real__evidencias"><article><h3>Testes de integração</h3><p>Fluxos verificados com DynamoDB Local; o relatório descreve o ambiente e os resultados.</p><a href={`${fontes}docs/testing/validation-2026-11-15.md`}>Ver validação ↗</a></article><article><h3>Qualidade da comparação</h3><p>A avaliação usa dados sintéticos com gabarito conhecido; não prevê desempenho com dados reais.</p><a href={`${fontes}docs/testing/phase-5-report.md`}>Ver avaliação ↗</a></article><article><h3>Medições e correções</h3><p>As medições foram locais. Erros e corridas inconclusivas continuam documentados.</p><a href={`${fontes}docs/testing/phase-7-report.md`}>Ver relatório ↗</a></article></div></section>
-    <section className="jornada-real__autor"><h2>Um projeto pessoal de Mateus Bueno</h2><p>O Nexus reúne implementação, infraestrutura, interface e documentação para investigar como receber e relacionar registros sem esconder as decisões e as falhas do caminho.</p><a href="https://github.com/Buenno0/nexus-architecture">Ver o repositório ↗</a></section>
-  </div>;
+  );
+}
+
+function Conector({ ativo, rotulo }: { ativo: boolean; rotulo: string }) {
+  return (
+    <li className={`conector ${ativo ? "conector--ativo" : ""}`} aria-hidden="true">
+      <span className="conector__linha"><span className="conector__pacote" /></span>
+      <span className="conector__rotulo">{rotulo}</span>
+    </li>
+  );
+}
+
+function nomeDe(payload: Record<string, unknown>): string {
+  const bruto = payload["full_name"] ?? payload["legal_name"];
+  return typeof bruto === "string" && bruto.trim() ? bruto : "sem nome";
+}
+
+function Comparacao({
+  resolvido,
+  evidencia,
+  par,
+}: {
+  resolvido: TrailEvent | undefined;
+  evidencia: Evidence | undefined;
+  par: [string, string] | null;
+}) {
+  if (!resolvido) {
+    return <p className="cmp__vazio">aguardando a mensagem</p>;
+  }
+  const candidatos = resolvido.detail["candidates"];
+  const matches = resolvido.detail["matches"];
+  // O resumo e do registro que o desenho acompanha; o par pode ser outro registro do
+  // mesmo lote. Sem dizer de quem e cada coisa, "0 correspondencias" ao lado de um
+  // MATCH parece contradicao.
+  const resumo = `registro acompanhado: ${typeof candidatos === "number" ? candidatos : "?"} candidatos · ${typeof matches === "number" ? matches : "?"} correspondências`;
+
+  if (!evidencia) {
+    return (
+      <div className="cmp">
+        <p className="cmp__resumo">{resumo}</p>
+        <p className="cmp__vazio">Nenhum par associado neste lote — o resultado também é uma resposta.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="cmp">
+      <p className="cmp__resumo">{resumo}</p>
+      <p className="cmp__par">
+        par associado no lote: <strong>{par?.[0]}</strong> × <strong>{par?.[1]}</strong>
+      </p>
+      <ul className="cmp__campos">
+        {evidencia.fields.map((f, i) => (
+          <li key={f.field} className="cmp__campo" style={{ ["--atraso" as string]: `${i * 140}ms` }}>
+            <span className="cmp__nome">{ROTULOS[f.field] ?? f.field}</span>
+            <span className="cmp__peso">{f.weight.toFixed(2)}</span>
+            <span className="cmp__barra" aria-hidden="true">
+              <span style={{ width: `${Math.round(f.score * 100)}%` }} />
+            </span>
+            <span className="cmp__nota">{f.score.toFixed(2)}</span>
+          </li>
+        ))}
+      </ul>
+      <p className={`cmp__decisao cmp__decisao--${evidencia.decision}`}>
+        soma {evidencia.total.toFixed(3)} → {DECISAO[evidencia.decision]}
+      </p>
+    </div>
+  );
+}
+
+function legendaDe(fase: string, proximo: Stage | undefined, resolvido: boolean, falta: boolean): string {
+  if (fase === "inicio") return "Nada foi enviado ainda. O primeiro botão cria o lote; o segundo pede o processamento.";
+  if (fase === "enviando") return "A API está validando e gravando o lote…";
+  if (fase === "processando") return "Dispatcher publicando e worker consumindo…";
+  if (fase === "erro") return "Algo deu errado neste passo.";
+  if (resolvido) return "O worker terminou. A evidência acima é a que ficou gravada com a decisão.";
+  if (falta) return "A fila é compartilhada e atende por ordem de chegada: este lote ainda não chegou à vez dele. Peça outro passo.";
+  if (proximo === "published" || proximo === "consumed") return "O lote está gravado e a mensagem espera na fila. Nada acontece até alguém apertar “Processar agora”.";
+  return "";
 }

@@ -34,9 +34,9 @@ describe("tela de arquitetura", () => {
     // SVG sem alternativa textual e decoracao para quem usa leitor de tela, e estes
     // desenhos carregam a explicacao, nao enfeite.
     render();
-    // O mapa da jornada, o fluxograma anterior e os cinco mecanismos.
+    // Os quatro icones das etapas, o fluxograma e os cinco mecanismos.
     const desenhos = screen.getAllByRole("img");
-    expect(desenhos).toHaveLength(7);
+    expect(desenhos).toHaveLength(10);
     for (const d of desenhos) {
       expect(d.getAttribute("aria-label")?.length ?? 0).toBeGreaterThan(20);
     }
@@ -46,6 +46,6 @@ describe("tela de arquitetura", () => {
     // De proposito: e a unica tela que funciona com a plataforma fora do ar, e e
     // justamente ela que explica o que o visitante deveria estar vendo.
     render();
-    expect(screen.getByText(/Uma mesma pessoa/)).toBeInTheDocument();
+    expect(screen.getByText(/Um lote atravessando o Nexus/)).toBeInTheDocument();
   });
 });
