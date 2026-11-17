@@ -2,13 +2,14 @@
  * A pagina publica.
  *
  * Uma rolagem, sem abas. Quem chega nao escolhe por onde comecar — a pagina conduz.
- * O painel de operador continua inteiro, atras do link do rodape.
- *
- * As secoes 4 a 7 do plano ainda nao existem; enquanto isso, o fecho leva ao
- * repositorio e ao console para que a pagina nao termine num precipicio.
+ * O painel de operador continua inteiro, atras do link da secao 6.
  */
 
+import { AoVivo } from "./AoVivo";
+import { Autor } from "./Autor";
 import { Decisao } from "./Decisao";
+import { Decisoes } from "./Decisoes";
+import { Medicoes } from "./Medicoes";
 import { Jornada } from "./Jornada";
 import { Pergunta } from "./Pergunta";
 import { useJornada } from "./useJornada";
@@ -40,18 +41,18 @@ export function Narrativa({ abrirConsole }: { abrirConsole: () => void }) {
         <Pergunta />
         <Jornada estado={jornada} />
         <Decisao estado={jornada} />
+        <Decisoes />
+        <Medicoes />
+        <AoVivo abrirConsole={abrirConsole} />
+        <Autor />
       </main>
 
+      {/* A autoria e os links agora vivem na secao 7. O rodape fica so com a
+          ressalva que precisa acompanhar a pagina inteira. */}
       <footer className="rodape-narrativa">
         <p>
-          Um projeto de Mateus Bueno. Os dados desta página são sintéticos: nenhum
-          registro corresponde a pessoa real.
-        </p>
-        <p className="rodape-narrativa__links">
-          <a href={REPO}>Ver o código</a>
-          <button type="button" className="elo" onClick={abrirConsole}>
-            Abrir o painel técnico
-          </button>
+          Todos os dados desta página são sintéticos: nenhum registro corresponde a
+          pessoa real. A demonstração grava de verdade, num acervo criado para ela.
         </p>
       </footer>
     </div>

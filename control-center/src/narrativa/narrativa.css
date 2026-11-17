@@ -631,3 +631,635 @@
     overflow-x: auto;
   }
 }
+
+/* ---- Secao 4: o mapa do sistema ---------------------------------------- */
+/* Grid de duas colunas no desktop, coluna unica no celular. O armazenamento fica ao
+   lado porque e tocado por dois nos diferentes — poe-lo na corrente sugeriria que ele
+   e uma etapa, e ele nao e. */
+
+.narrativa .mapa {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  align-items: center;
+  gap: var(--e-6);
+  margin: var(--e-7) 0 0;
+}
+
+.narrativa .mapa__fluxo {
+  display: grid;
+  gap: 0;
+}
+
+.narrativa .no {
+  border: 1px solid var(--linha-forte);
+  border-radius: var(--r-3);
+  padding: var(--e-4) var(--e-5);
+  background: var(--papel);
+}
+
+.narrativa .no__nome {
+  margin: 0;
+  color: var(--tinta);
+  font-size: var(--t-corpo);
+  font-weight: var(--peso-forte);
+}
+
+.narrativa .no__faz {
+  margin: var(--e-1) 0 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+/* Cinza = infraestrutura e mundo externo, azul = codigo nosso, verde = dado.
+   Tres famílias, nao sete: cor sem significado vira enfeite. */
+.narrativa .no--externo,
+.narrativa .no--infra {
+  background: var(--papel-2);
+}
+
+.narrativa .no--servico {
+  border-color: var(--azul);
+  background: var(--azul-lavado);
+}
+
+.narrativa .no--servico .no__nome {
+  color: var(--azul-escuro);
+}
+
+.narrativa .no--dado {
+  border-color: var(--match);
+  background: var(--match-lavado);
+}
+
+.narrativa .no--dado .no__nome {
+  color: var(--match);
+}
+
+/* O elo carrega a informacao mais importante do mapa: quem espera por quem. */
+.narrativa .elo {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--e-4);
+  padding: var(--e-3) 0 var(--e-3) var(--e-6);
+}
+
+.narrativa .elo__linha {
+  width: 0;
+  height: var(--e-6);
+  border-left: 2px solid var(--linha-forte);
+}
+
+.narrativa .elo__linha--assincrona {
+  border-left-style: dashed;
+  border-left-color: var(--azul);
+}
+
+.narrativa .elo__texto {
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .fronteira {
+  border: 1px dashed var(--linha-forte);
+  border-radius: var(--r-3);
+  padding: var(--e-5);
+}
+
+.narrativa .fronteira__rotulo {
+  margin: 0 0 var(--e-4);
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.narrativa .mapa__dado {
+  display: grid;
+  gap: var(--e-3);
+}
+
+.narrativa .mapa__dado-nota,
+.narrativa .mapa__legenda {
+  margin: 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .mapa__legenda {
+  grid-column: 1 / -1;
+  max-width: var(--largura-texto);
+  margin-top: var(--e-5);
+  border-top: 1px solid var(--linha);
+  padding-top: var(--e-4);
+}
+
+.narrativa .mapa__legenda a,
+.narrativa .decisao__fonte {
+  color: var(--azul);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+}
+
+.narrativa .mapa__legenda a:hover,
+.narrativa .decisao__fonte:hover {
+  text-decoration: underline;
+}
+
+/* ---- Secao 4: o par de comparacao -------------------------------------- */
+
+.narrativa .tradeoff {
+  margin: var(--e-5) 0 0;
+}
+
+.narrativa .tradeoff__par {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-4);
+}
+
+.narrativa .caminho {
+  border: 1px solid var(--linha);
+  border-radius: var(--r-3);
+  padding: var(--e-4);
+}
+
+.narrativa .caminho__titulo {
+  margin: 0 0 var(--e-3);
+  color: var(--tinta);
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-forte);
+}
+
+.narrativa .caminho__passos {
+  display: grid;
+  gap: var(--e-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A borda lateral nao leva raio: canto arredondado so funciona com borda inteira. */
+.narrativa .passo {
+  border-left: 2px solid var(--linha-forte);
+  border-radius: 0;
+  padding: var(--e-2) 0 var(--e-2) var(--e-3);
+}
+
+.narrativa .passo--falha {
+  border-left-color: var(--falha);
+}
+
+.narrativa .passo--bom {
+  border-left-color: var(--match);
+}
+
+.narrativa .passo__nome {
+  display: block;
+  color: var(--tinta);
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-medio);
+}
+
+/* O tom tambem e palavra: "a rede falha aqui" diz o que a cor da borda sugere. */
+.narrativa .passo__detalhe {
+  display: block;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .tradeoff__custo {
+  max-width: var(--largura-texto);
+  margin: var(--e-4) 0 0;
+  border-left: 2px solid var(--ouro);
+  border-radius: 0;
+  padding-left: var(--e-4);
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .tradeoff__custo strong {
+  color: var(--tinta);
+}
+
+/* ---- Secao 4: as decisoes ----------------------------------------------- */
+
+.narrativa .decisoes {
+  margin-top: var(--e-7);
+  border-top: 1px solid var(--linha);
+}
+
+.narrativa .decisao {
+  border-bottom: 1px solid var(--linha);
+}
+
+.narrativa .decisao__resumo {
+  display: grid;
+  gap: var(--e-1);
+  padding: var(--e-5) var(--e-6) var(--e-5) 0;
+  cursor: pointer;
+  list-style: none;
+  position: relative;
+}
+
+.narrativa .decisao__resumo::-webkit-details-marker {
+  display: none;
+}
+
+.narrativa .decisao__resumo::after {
+  content: "+";
+  position: absolute;
+  top: var(--e-5);
+  right: 0;
+  color: var(--azul);
+  font-size: var(--t-destaque);
+  line-height: 1;
+}
+
+.narrativa .decisao[open] .decisao__resumo::after {
+  content: "−";
+}
+
+.narrativa .decisao__pergunta {
+  color: var(--tinta);
+  font-size: var(--t-corpo-g);
+  font-weight: var(--peso-medio);
+}
+
+.narrativa .decisao__dica {
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .decisao__corpo {
+  padding: 0 0 var(--e-6);
+}
+
+.narrativa .decisao__corpo p {
+  max-width: var(--largura-texto);
+  margin: 0 0 var(--e-3);
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .decisao__corpo strong {
+  color: var(--tinta);
+}
+
+.narrativa .decisao__fonte {
+  display: inline-block;
+  margin-top: var(--e-4);
+  font-size: var(--t-apoio);
+}
+
+@media (max-width: 900px) {
+  .narrativa .mapa {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--e-5);
+  }
+}
+
+@media (max-width: 640px) {
+  .narrativa .tradeoff__par {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .narrativa .elo {
+    padding-left: var(--e-5);
+  }
+
+  .narrativa .fronteira {
+    padding: var(--e-4);
+  }
+}
+
+/* ---- Secao 5: os numeros medidos --------------------------------------- */
+
+.narrativa .medidas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--e-4);
+  margin-top: var(--e-7);
+}
+
+.narrativa .medida {
+  display: grid;
+  align-content: start;
+  gap: var(--e-3);
+  background: var(--papel-2);
+  border-radius: var(--r-3);
+  padding: var(--e-5);
+}
+
+.narrativa .medida__nome {
+  margin: 0;
+  color: var(--tinta);
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-forte);
+}
+
+.narrativa .medida__linhas {
+  display: grid;
+  gap: var(--e-2);
+  margin: 0;
+}
+
+/* Valor e rotulo na mesma linha: o numero sozinho nao diz do que e, e um numero
+   sem unidade ao lado e a forma mais rapida de inventar uma leitura errada. */
+.narrativa .medida__linha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--e-3);
+}
+
+.narrativa .medida__valor {
+  color: var(--tinta);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-destaque);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.narrativa .medida__rotulo {
+  margin: 0;
+  color: var(--tinta-suave);
+  font-size: var(--t-nota);
+}
+
+/* A ressalva vai junto do numero, nunca no rodape da pagina: separada dela, ela
+   deixa de ser lida e o numero vira promessa. */
+.narrativa .medida__onde {
+  margin: 0;
+  border-top: 1px solid var(--linha);
+  padding-top: var(--e-3);
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+/* ---- Secao 5: os erros -------------------------------------------------- */
+
+.narrativa .medicoes__subtitulo {
+  margin: var(--e-8) 0 0;
+  font-family: var(--fonte-display);
+  font-size: var(--t-secao);
+  font-weight: var(--peso-normal);
+  letter-spacing: -0.02em;
+}
+
+.narrativa .medicoes__intro {
+  max-width: var(--largura-texto);
+  margin: var(--e-3) 0 0;
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .erros {
+  display: grid;
+  gap: var(--e-6);
+  margin: var(--e-6) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: erro;
+}
+
+.narrativa .erro {
+  counter-increment: erro;
+  border-top: 1px solid var(--linha);
+  padding-top: var(--e-4);
+}
+
+.narrativa .erro__titulo {
+  margin: 0 0 var(--e-3);
+  max-width: var(--largura-texto);
+  color: var(--tinta);
+  font-size: var(--t-corpo);
+  font-weight: var(--peso-medio);
+}
+
+.narrativa .erro__titulo::before {
+  content: counter(erro) ". ";
+  color: var(--tinta-fraca);
+  font-family: var(--fonte-mono);
+}
+
+.narrativa .erro__linha {
+  max-width: var(--largura-texto);
+  margin: 0 0 var(--e-2);
+  border-left: 2px solid var(--linha-forte);
+  border-radius: 0;
+  padding-left: var(--e-4);
+  color: var(--tinta-suave);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .erro__linha--errada {
+  border-left-color: var(--falha);
+}
+
+.narrativa .erro__linha--certa {
+  border-left-color: var(--match);
+}
+
+/* O rotulo e palavra, nao so cor: quem nao distingue vermelho de verde le
+   "Eu conclui" e "Era" do mesmo jeito. */
+.narrativa .erro__marca {
+  display: block;
+  color: var(--tinta-fraca);
+  font-size: var(--t-micro);
+  font-weight: var(--peso-forte);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.narrativa .erro__linha--errada .erro__marca {
+  color: var(--falha);
+}
+
+.narrativa .erro__linha--certa .erro__marca {
+  color: var(--match);
+}
+
+/* ---- Secao 5: a licao --------------------------------------------------- */
+
+.narrativa .licao {
+  max-width: var(--largura-texto);
+  margin: var(--e-8) 0 0;
+  border-left: 2px solid var(--ouro);
+  border-radius: 0;
+  padding-left: var(--e-5);
+}
+
+.narrativa .licao p {
+  margin: 0;
+  color: var(--tinta);
+  font-family: var(--fonte-display);
+  font-size: var(--t-destaque);
+  font-weight: var(--peso-normal);
+  line-height: var(--altura-titulo);
+  letter-spacing: -0.01em;
+}
+
+/* Seletor mais especifico que `.narrativa .licao p`, em vez de !important: a
+   citacao e display, o antidoto e texto corrido, e a diferenca entre os dois e o
+   que faz a frase final soar como conclusao e nao como continuacao. */
+.narrativa .licao p.licao__antidoto {
+  margin-top: var(--e-4);
+  color: var(--tinta-suave);
+  font-family: var(--fonte-texto);
+  font-size: var(--t-apoio);
+  line-height: var(--altura-texto);
+}
+
+.narrativa .medicoes__rodape {
+  max-width: var(--largura-texto);
+  margin: var(--e-7) 0 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .medicoes__rodape strong {
+  color: var(--tinta-suave);
+}
+
+.narrativa .medicoes__rodape a {
+  color: var(--azul);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+}
+
+.narrativa .medicoes__rodape a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 640px) {
+  .narrativa .medidas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .narrativa .medida__linha {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+}
+
+/* ---- Secao 6: os numeros ao vivo --------------------------------------- */
+/* So entra na grade o que tem valor, entao o auto-fit nunca produz uma linha de
+   travessoes — era exatamente o que fazia o painel antigo parecer quebrado. */
+
+.narrativa .placar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--e-5);
+  margin: var(--e-7) 0 0;
+}
+
+.narrativa .placar__item {
+  border-top: 2px solid var(--azul);
+  padding-top: var(--e-3);
+}
+
+.narrativa .placar__valor {
+  color: var(--tinta);
+  font-family: var(--fonte-mono);
+  font-size: var(--t-titulo);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--altura-apertada);
+}
+
+.narrativa .placar__nome {
+  margin: var(--e-2) 0 0;
+  color: var(--tinta-suave);
+  font-size: var(--t-nota);
+}
+
+/* O selo de origem do ADR-009 continua, mas como uma frase no rodape da grade em vez
+   de uma pilula verde em cada cartao: a regra e a mesma, o volume e outro. */
+.narrativa .placar__origem,
+.narrativa .aovivo__saida {
+  max-width: var(--largura-texto);
+  margin: var(--e-5) 0 0;
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+}
+
+.narrativa .placar__origem strong {
+  color: var(--tinta-suave);
+}
+
+.narrativa .aovivo__saida {
+  margin-top: var(--e-7);
+  border-top: 1px solid var(--linha);
+  padding-top: var(--e-4);
+}
+
+/* ---- Secao 7: quem fez -------------------------------------------------- */
+
+.narrativa .secao--autor {
+  border-bottom: 0;
+}
+
+.narrativa .autor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: var(--e-7);
+  margin-top: var(--e-6);
+}
+
+.narrativa .autor__texto p {
+  max-width: var(--largura-texto);
+  margin: 0 0 var(--e-4);
+  color: var(--tinta-suave);
+}
+
+.narrativa .autor__tese {
+  border-left: 2px solid var(--ouro);
+  border-radius: 0;
+  padding-left: var(--e-4);
+  font-size: var(--t-apoio);
+}
+
+.narrativa .autor__tese strong {
+  color: var(--tinta);
+}
+
+.narrativa .autor__links {
+  display: grid;
+  align-content: start;
+  gap: var(--e-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.narrativa .autor__link {
+  display: grid;
+  gap: var(--e-1);
+  border: 1px solid var(--linha);
+  border-radius: var(--r-3);
+  padding: var(--e-4);
+  color: var(--azul);
+  font-size: var(--t-apoio);
+  font-weight: var(--peso-medio);
+  text-decoration: none;
+  transition: border-color var(--mov-rapido) var(--mov-curva);
+}
+
+.narrativa .autor__link:hover {
+  border-color: var(--azul);
+  text-decoration: none;
+}
+
+.narrativa .autor__link-nota {
+  color: var(--tinta-fraca);
+  font-size: var(--t-nota);
+  font-weight: var(--peso-normal);
+}
+
+@media (max-width: 900px) {
+  .narrativa .autor {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--e-5);
+  }
+}
